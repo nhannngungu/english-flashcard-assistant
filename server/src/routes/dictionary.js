@@ -1,4 +1,9 @@
 import { Router } from 'express'
+import {
+  cleanLearnerDefinition,
+  selectFreeDictionaryApiCandidates,
+} from '../services/definitionSelection.js'
+import { translateEnglishToVietnamese } from '../services/translation.js'
 
 const router = Router()
 const requestTimeoutMilliseconds = 8000
@@ -58,62 +63,37 @@ function firstExample(value) {
   return cleanText(value)
 }
 
-function findPrimaryFreeDictionaryApiSense(senses) {
-  if (!Array.isArray(senses)) {
-    return null
-  }
-
-  for (const sense of senses) {
-    if (cleanText(sense.definition)) {
-      return sense
-    }
-
-    const nestedSense = findPrimaryFreeDictionaryApiSense(sense.subsenses)
-
-    if (nestedSense) {
-      return nestedSense
-    }
-  }
-
-  return null
-}
-
 export function parseFreeDictionaryApiResponse(providerResponse, requestedWord) {
   if (!providerResponse || typeof providerResponse !== 'object' || Array.isArray(providerResponse)) {
     return null
   }
 
   const entries = Array.isArray(providerResponse.entries) ? providerResponse.entries : []
+  const [primaryDefinition] = selectFreeDictionaryApiCandidates(entries)
 
-  for (const entry of entries) {
-    const primarySense = findPrimaryFreeDictionaryApiSense(entry.senses)
-
-    if (!primarySense) {
-      continue
-    }
-
-    const pronunciations = entries.flatMap((item) =>
-      Array.isArray(item.pronunciations) ? item.pronunciations : [],
-    )
-    const phoneticEntry =
-      pronunciations.find((item) => item.type === 'ipa' && cleanText(item.text)) ||
-      pronunciations.find((item) => cleanText(item.text))
-    const audioEntry = pronunciations.find(
-      (item) => cleanText(item.audio) || cleanText(item.audioUrl) || cleanText(item.audio_url),
-    )
-
-    return {
-      word: cleanText(providerResponse.word) || requestedWord,
-      phonetic: cleanText(phoneticEntry?.text),
-      audio_url: normalizeAudioUrl(audioEntry?.audio || audioEntry?.audioUrl || audioEntry?.audio_url),
-      part_of_speech: cleanText(entry.partOfSpeech),
-      meaning: cleanText(primarySense.definition),
-      example: firstExample(primarySense.examples),
-      source: providers[0].name,
-    }
+  if (!primaryDefinition) {
+    return null
   }
 
-  return null
+  const pronunciations = entries.flatMap((item) =>
+    Array.isArray(item.pronunciations) ? item.pronunciations : [],
+  )
+  const phoneticEntry =
+    pronunciations.find((item) => item.type === 'ipa' && cleanText(item.text)) ||
+    pronunciations.find((item) => cleanText(item.text))
+  const audioEntry = pronunciations.find(
+    (item) => cleanText(item.audio) || cleanText(item.audioUrl) || cleanText(item.audio_url),
+  )
+
+  return {
+    word: cleanText(providerResponse.word) || requestedWord,
+    phonetic: cleanText(phoneticEntry?.text),
+    audio_url: normalizeAudioUrl(audioEntry?.audio || audioEntry?.audioUrl || audioEntry?.audio_url),
+    part_of_speech: primaryDefinition.partOfSpeech,
+    meaning_en: primaryDefinition.definition,
+    example: primaryDefinition.example,
+    source: providers[0].name,
+  }
 }
 
 export function parseSuvankarResponse(providerResponse, requestedWord) {
@@ -159,7 +139,7 @@ export function parseSuvankarResponse(providerResponse, requestedWord) {
           entry.audioUrl || entry.audio_url || entry.audio || audioEntry?.audio || audioEntry?.audioUrl || audioEntry?.audio_url,
         ),
         part_of_speech: cleanText(meaning.partOfSpeech),
-        meaning: definition,
+        meaning_en: definition,
         example: firstExample(sense.examples ?? sense.example),
         source: providers[1].name,
       }
@@ -194,7 +174,7 @@ export function parseDictionaryApiDevResponse(entries, requestedWord) {
         phonetic: cleanText(entry.phonetic) || cleanText(phoneticEntry?.text),
         audio_url: normalizeAudioUrl(audioEntry?.audio),
         part_of_speech: cleanText(meaning.partOfSpeech),
-        meaning: cleanText(primaryDefinition.definition),
+        meaning_en: cleanText(primaryDefinition.definition),
         example: cleanText(primaryDefinition.example),
         source: providers[2].name,
       }
@@ -257,6 +237,23 @@ async function lookupProvider(provider, word) {
   }
 }
 
+async function addVietnameseMeaning(dictionaryEntry) {
+  const meaningEn = cleanLearnerDefinition(dictionaryEntry.meaning_en).definition
+  const translation = await translateEnglishToVietnamese(meaningEn)
+
+  return {
+    word: dictionaryEntry.word,
+    phonetic: dictionaryEntry.phonetic,
+    audio_url: dictionaryEntry.audio_url,
+    part_of_speech: dictionaryEntry.part_of_speech,
+    meaning_en: meaningEn,
+    meaning_vi: translation.meaningVi,
+    example: dictionaryEntry.example,
+    source: dictionaryEntry.source,
+    translation_source: translation.source,
+  }
+}
+
 router.get('/:word', async (request, response) => {
   const word = cleanText(request.params.word)
 
@@ -270,7 +267,8 @@ router.get('/:word', async (request, response) => {
     const result = await lookupProvider(provider, word)
 
     if (result.type === 'success') {
-      return response.json(result.data)
+      const enrichedEntry = await addVietnameseMeaning(result.data)
+      return response.json(enrichedEntry)
     }
 
     if (result.type === 'not-found') {

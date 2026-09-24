@@ -136,10 +136,13 @@ th {
   max-width: 620px;
 }
 
-.word-form label {
+.form-field {
   display: grid;
-  font-weight: 600;
   gap: 0.4rem;
+}
+
+.form-field label {
+  font-weight: 600;
 }
 
 .word-form input,
@@ -155,6 +158,39 @@ th {
 
 .word-form textarea {
   resize: vertical;
+}
+
+.word-lookup-control {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.word-lookup-control input {
+  min-width: 0;
+}
+
+.word-lookup-control button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.lookup-sources {
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+.lookup-sources p {
+  margin: 0;
+}
+
+.flashcard-primary-meaning {
+  font-size: 1.05rem;
+}
+
+.flashcard-supporting-definition {
+  color: #4b5563;
+  font-size: 0.92rem;
 }
 
 .primary-button {
@@ -374,6 +410,15 @@ th {
 
   .form-actions button,
   .review-actions button {
+    width: 100%;
+  }
+
+  .word-lookup-control {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .word-lookup-control button {
     width: 100%;
   }
 

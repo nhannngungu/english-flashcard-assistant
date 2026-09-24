@@ -14,7 +14,9 @@ async function readJson(response) {
   }
 
   if (!response.ok) {
-    throw new Error(data.error || 'Something went wrong. Please try again.')
+    const error = new Error(data.error || 'Something went wrong. Please try again.')
+    error.status = response.status
+    throw error
   }
 
   return data
@@ -65,4 +67,8 @@ export function updateVocabularyStatus(id, status) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
   })
+}
+
+export function lookupDictionary(word) {
+  return request(`/api/dictionary/${encodeURIComponent(word.trim())}`)
 }

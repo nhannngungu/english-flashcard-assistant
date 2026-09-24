@@ -17,6 +17,8 @@ db.serialize(() => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       word TEXT NOT NULL,
       meaning TEXT NOT NULL DEFAULT '',
+      meaning_en TEXT NOT NULL DEFAULT '',
+      meaning_vi TEXT NOT NULL DEFAULT '',
       part_of_speech TEXT,
       example TEXT,
       image_url TEXT,
@@ -52,6 +54,35 @@ db.serialize(() => {
         }
       })
     }
+
+    if (!columnNames.has('meaning_en')) {
+      db.run("ALTER TABLE vocabularies ADD COLUMN meaning_en TEXT NOT NULL DEFAULT ''", (migrationError) => {
+        if (migrationError) {
+          console.error('Could not add the meaning_en column.', migrationError)
+        }
+      })
+    }
+
+    if (!columnNames.has('meaning_vi')) {
+      db.run("ALTER TABLE vocabularies ADD COLUMN meaning_vi TEXT NOT NULL DEFAULT ''", (migrationError) => {
+        if (migrationError) {
+          console.error('Could not add the meaning_vi column.', migrationError)
+        }
+      })
+    }
+
+    db.run(
+      `
+        UPDATE vocabularies
+        SET meaning_en = meaning
+        WHERE TRIM(meaning_en) = '' AND TRIM(meaning) != ''
+      `,
+      (migrationError) => {
+        if (migrationError) {
+          console.error('Could not migrate existing meanings to meaning_en.', migrationError)
+        }
+      },
+    )
   })
 })
 

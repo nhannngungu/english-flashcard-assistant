@@ -25,6 +25,7 @@ function optionalText(value) {
 function getVocabularyInput(body = {}) {
   const word = optionalText(body.word)
   const status = body.status === undefined ? 'new' : optionalText(body.status)
+  const meaningEn = optionalText(body.meaning_en) || optionalText(body.meaning)
 
   if (!word) {
     return { error: 'word is required and cannot be empty.' }
@@ -37,10 +38,13 @@ function getVocabularyInput(body = {}) {
   return {
     value: {
       word,
-      meaning: optionalText(body.meaning),
+      meaningEn,
+      meaningVi: body.meaning_vi === undefined ? null : optionalText(body.meaning_vi),
       partOfSpeech: optionalText(body.part_of_speech),
       example: optionalText(body.example),
       imageUrl: optionalText(body.image_url),
+      phonetic: optionalText(body.phonetic),
+      audioUrl: optionalText(body.audio_url),
       status,
     },
   }
@@ -91,13 +95,24 @@ router.post('/', (request, response) => {
   const values = input.value
   const query = `
     INSERT INTO vocabularies
-      (word, meaning, part_of_speech, example, image_url, status)
-    VALUES (?, ?, ?, ?, ?, ?)
+      (word, meaning, meaning_en, meaning_vi, part_of_speech, example, image_url, phonetic, audio_url, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `
 
   db.run(
     query,
-    [values.word, values.meaning, values.partOfSpeech, values.example, values.imageUrl, values.status],
+    [
+      values.word,
+      values.meaningEn,
+      values.meaningEn,
+      values.meaningVi ?? '',
+      values.partOfSpeech,
+      values.example,
+      values.imageUrl,
+      values.phonetic,
+      values.audioUrl,
+      values.status,
+    ],
     function insertVocabulary(error) {
       if (error) {
         return sendDatabaseError(response, error)
@@ -130,14 +145,27 @@ router.put('/:id', (request, response) => {
   const values = input.value
   const query = `
     UPDATE vocabularies
-    SET word = ?, meaning = ?, part_of_speech = ?, example = ?, image_url = ?,
-        status = ?, updated_at = CURRENT_TIMESTAMP
+    SET word = ?, meaning = ?, meaning_en = ?, meaning_vi = COALESCE(?, meaning_vi),
+        part_of_speech = ?, example = ?, image_url = ?,
+        phonetic = ?, audio_url = ?, status = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `
 
   db.run(
     query,
-    [values.word, values.meaning, values.partOfSpeech, values.example, values.imageUrl, values.status, id],
+    [
+      values.word,
+      values.meaningEn,
+      values.meaningEn,
+      values.meaningVi,
+      values.partOfSpeech,
+      values.example,
+      values.imageUrl,
+      values.phonetic,
+      values.audioUrl,
+      values.status,
+      id,
+    ],
     function updateVocabulary(error) {
       if (error) {
         return sendDatabaseError(response, error)

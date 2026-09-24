@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getVocabularies, updateVocabularyStatus } from '../api/vocabularies.js'
+import { getEnglishDefinition, getVietnameseMeaning } from '../utils/vocabulary.js'
 
 function ReviewPage() {
   const [cards, setCards] = useState([])
@@ -64,6 +65,8 @@ function ReviewPage() {
   }
 
   const currentCard = cards[currentIndex]
+  const vietnameseMeaning = getVietnameseMeaning(currentCard)
+  const englishDefinition = getEnglishDefinition(currentCard)
 
   return (
     <section className="review-section">
@@ -78,9 +81,14 @@ function ReviewPage() {
 
         {isRevealed && (
           <div className="flashcard-answer">
-            <p>
-              <strong>Meaning:</strong> {currentCard.meaning || 'No meaning added.'}
+            <p className="flashcard-primary-meaning">
+              <strong>Vietnamese Meaning:</strong> {vietnameseMeaning || 'No Vietnamese meaning added.'}
             </p>
+            {englishDefinition && (
+              <p className="flashcard-supporting-definition">
+                <strong>English Definition:</strong> {englishDefinition}
+              </p>
+            )}
             {currentCard.example && (
               <p>
                 <strong>Example:</strong> {currentCard.example}

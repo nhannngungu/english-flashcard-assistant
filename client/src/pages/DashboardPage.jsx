@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getVocabularies } from '../api/vocabularies.js'
+import { getVietnameseMeaning } from '../utils/vocabulary.js'
 
 function DashboardPage({ onNavigate }) {
   const [vocabularies, setVocabularies] = useState([])
@@ -93,7 +94,7 @@ function DashboardPage({ onNavigate }) {
               <thead>
                 <tr>
                   <th scope="col">Word</th>
-                  <th scope="col">Meaning</th>
+                  <th scope="col">Vietnamese Meaning</th>
                   <th scope="col">Status</th>
                 </tr>
               </thead>
@@ -101,7 +102,7 @@ function DashboardPage({ onNavigate }) {
                 {recentVocabularies.map((vocabulary) => (
                   <tr key={vocabulary.id}>
                     <td>{vocabulary.word}</td>
-                    <td>{vocabulary.meaning || '—'}</td>
+                    <td>{getVietnameseMeaning(vocabulary) || '—'}</td>
                     <td>
                       <span className={`status status-${vocabulary.status}`}>{vocabulary.status}</span>
                     </td>

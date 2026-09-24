@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
 import { deleteVocabulary, getVocabularies, updateVocabulary } from '../api/vocabularies.js'
 import VocabularyFormFields from '../components/VocabularyFormFields.jsx'
+import { getEnglishDefinition, getVietnameseMeaning } from '../utils/vocabulary.js'
 
 function createEditForm(vocabulary) {
   return {
     word: vocabulary.word || '',
-    meaning: vocabulary.meaning || '',
+    phonetic: vocabulary.phonetic || '',
+    meaning_vi: getVietnameseMeaning(vocabulary),
+    meaning_en: getEnglishDefinition(vocabulary),
     part_of_speech: vocabulary.part_of_speech || '',
     example: vocabulary.example || '',
+    audio_url: vocabulary.audio_url || '',
     image_url: vocabulary.image_url || '',
     status: vocabulary.status || 'new',
   }
@@ -137,7 +141,7 @@ function VocabularyPage({ refreshKey }) {
             <thead>
               <tr>
                 <th scope="col">Word</th>
-                <th scope="col">Meaning</th>
+                <th scope="col">Vietnamese Meaning</th>
                 <th scope="col">Part of Speech</th>
                 <th scope="col">Status</th>
                 <th scope="col">Actions</th>
@@ -147,7 +151,7 @@ function VocabularyPage({ refreshKey }) {
               {vocabularies.map((vocabulary) => (
                 <tr key={vocabulary.id}>
                   <td>{vocabulary.word}</td>
-                  <td>{vocabulary.meaning || '—'}</td>
+                  <td>{getVietnameseMeaning(vocabulary) || '—'}</td>
                   <td>{vocabulary.part_of_speech || '—'}</td>
                   <td>
                     <span className={`status status-${vocabulary.status}`}>{vocabulary.status}</span>
