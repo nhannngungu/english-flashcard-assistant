@@ -8,6 +8,7 @@ A beginner-friendly vocabulary learning app. This repository currently contains 
 - `server/` — Express API and SQLite setup.
 - `server/src/database.js` — creates the local SQLite database and the future `vocabularies` table on server startup.
 - `server/src/index.js` — starts the API and provides `GET /api/health`.
+- `server/src/routes/vocabularies.js` — vocabulary CRUD routes and request validation.
 
 ## Run locally
 
@@ -37,6 +38,19 @@ Invoke-RestMethod http://localhost:3000/api/health
 
 The expected response is `status: ok` and `database: connected`.
 
+## Vocabulary API
+
+The backend exposes these endpoints:
+
+- `GET /api/vocabularies` — list vocabulary records.
+- `GET /api/vocabularies/:id` — get one record.
+- `POST /api/vocabularies` — create a record.
+- `PUT /api/vocabularies/:id` — replace a record.
+- `PATCH /api/vocabularies/:id/status` — change only a record's status.
+- `DELETE /api/vocabularies/:id` — delete a record.
+
+`word` is required and every text value is trimmed. Valid statuses are `new`, `learning`, and `learned`. Validation and missing records return JSON error responses.
+
 ## Deliberately deferred
 
-The Dashboard, Vocabulary, Add Words, and Review pages, plus the vocabulary CRUD endpoints, will be added in later work. OCR, AI, and authentication are not included.
+The Dashboard, Vocabulary, Add Words, and Review pages will be added in later work. OCR, AI, and authentication are not included.

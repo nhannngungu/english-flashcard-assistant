@@ -1,5 +1,6 @@
 import express from 'express'
 import db from './database.js'
+import vocabularyRoutes from './routes/vocabularies.js'
 
 const app = express()
 const port = process.env.PORT || 3000
@@ -14,6 +15,17 @@ app.get('/api/health', (request, response) => {
 
     return response.json({ status: 'ok', database: 'connected' })
   })
+})
+
+app.use('/api/vocabularies', vocabularyRoutes)
+
+app.use((error, request, response, next) => {
+  if (error instanceof SyntaxError && 'body' in error) {
+    return response.status(400).json({ error: 'Request body must be valid JSON.' })
+  }
+
+  console.error(error)
+  return response.status(500).json({ error: 'An unexpected server error occurred.' })
 })
 
 app.listen(port, () => {

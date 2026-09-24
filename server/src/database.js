@@ -16,7 +16,7 @@ db.serialize(() => {
     CREATE TABLE IF NOT EXISTS vocabularies (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       word TEXT NOT NULL,
-      meaning TEXT NOT NULL,
+      meaning TEXT NOT NULL DEFAULT '',
       part_of_speech TEXT,
       example TEXT,
       image_url TEXT,
