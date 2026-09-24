@@ -30,7 +30,9 @@ h2 {
 }
 
 .navigation-link,
-.primary-button {
+.primary-button,
+.secondary-button,
+.delete-button {
   border: 0;
   border-radius: 6px;
   cursor: pointer;
@@ -151,4 +153,53 @@ th {
 .primary-button:disabled {
   cursor: wait;
   opacity: 0.7;
+}
+
+.secondary-button,
+.delete-button {
+  background: #ffffff;
+  border: 1px solid #9ca3af;
+  color: #374151;
+}
+
+.secondary-button:hover {
+  background: #f3f4f6;
+}
+
+.delete-button {
+  border-color: #dc2626;
+  color: #b91c1c;
+}
+
+.delete-button:hover {
+  background: #fef2f2;
+}
+
+.delete-button:disabled,
+.secondary-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.table-actions,
+.form-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.table-actions button,
+.form-actions button {
+  padding: 0.45rem 0.7rem;
+}
+
+.edit-form {
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+}
+
+.edit-form h3 {
+  margin: 0;
 }
