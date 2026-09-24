@@ -1,56 +1,116 @@
 # English Flashcard Assistant
 
-A beginner-friendly vocabulary learning app. This repository currently contains only the Version 1 foundation: a React frontend and an Express/SQLite backend.
+A beginner-friendly full-stack app for collecting English vocabulary, tracking learning status, and reviewing words as flashcards.
 
-## Project structure
+## Features
 
-- `client/` — React frontend powered by Vite.
-- `server/` — Express API and SQLite setup.
-- `server/src/database.js` — creates the local SQLite database and the future `vocabularies` table on server startup.
-- `server/src/index.js` — starts the API and provides `GET /api/health`.
-- `server/src/routes/vocabularies.js` — vocabulary CRUD routes and request validation.
+- Dashboard with vocabulary totals and review counts
+- Vocabulary list with create, edit, and delete actions
+- Vocabulary statuses: `new`, `learning`, and `learned`
+- Flashcard review for `new` and `learning` words
+- SQLite persistence and a REST API
+- Responsive interface with basic accessibility and error feedback
 
-## Run locally
+## Tech Stack
 
-Open two terminals from the repository root.
+- **Frontend:** React, Vite
+- **Backend:** Node.js, Express
+- **Database:** SQLite
 
-```powershell
-cd client
-npm install
-npm run dev
+## Project Structure
+
+```text
+english-flashcard-assistant/
+├── client/                 # React + Vite frontend
+│   └── src/
+├── server/                 # Express + SQLite backend
+│   └── src/
+│       ├── database.js      # Database initialization
+│       ├── index.js         # Express server
+│       └── routes/          # API routes
+├── docs/
+│   └── screenshots/         # Portfolio screenshots
+└── README.md
 ```
 
-`npm install` downloads the frontend dependencies. `npm run dev` starts the Vite development server, which will show its local URL in the terminal.
+## How to Run
 
-```powershell
-cd server
-npm install
-npm run dev
-```
+Use two terminals from the repository root.
 
-`npm install` downloads Express and the SQLite driver. `npm run dev` starts the API at `http://localhost:3000` and recreates it automatically when a server source file changes.
+1. Install and run the backend:
 
-Check the backend with:
+   ```powershell
+   cd server
+   npm install
+   npm run dev
+   ```
 
-```powershell
-Invoke-RestMethod http://localhost:3000/api/health
-```
+   The API starts at `http://localhost:3000`.
 
-The expected response is `status: ok` and `database: connected`.
+2. Install and run the frontend:
 
-## Vocabulary API
+   ```powershell
+   cd client
+   npm install
+   npm run dev
+   ```
 
-The backend exposes these endpoints:
+   Open the local URL shown by Vite (usually `http://localhost:5173`). Frontend `/api` requests are proxied to the backend.
 
-- `GET /api/vocabularies` — list vocabulary records.
-- `GET /api/vocabularies/:id` — get one record.
-- `POST /api/vocabularies` — create a record.
-- `PUT /api/vocabularies/:id` — replace a record.
-- `PATCH /api/vocabularies/:id/status` — change only a record's status.
-- `DELETE /api/vocabularies/:id` — delete a record.
+## API Endpoints
 
-`word` is required and every text value is trimmed. Valid statuses are `new`, `learning`, and `learned`. Validation and missing records return JSON error responses.
+Base URL: `http://localhost:3000`
 
-## Deliberately deferred
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET | `/api/vocabularies` | List all vocabulary items |
+| GET | `/api/vocabularies/:id` | Get one vocabulary item |
+| POST | `/api/vocabularies` | Create a vocabulary item |
+| PUT | `/api/vocabularies/:id` | Update a vocabulary item |
+| DELETE | `/api/vocabularies/:id` | Delete a vocabulary item |
+| PATCH | `/api/vocabularies/:id/status` | Update a vocabulary status |
 
-The Dashboard, Vocabulary, Add Words, and Review pages will be added in later work. OCR, AI, and authentication are not included.
+Vocabulary status values are `new`, `learning`, and `learned`.
+
+## Version 1 Status
+
+- [x] Dashboard with vocabulary statistics
+- [x] Vocabulary list and status badges
+- [x] Add, edit, and delete vocabulary
+- [x] Flashcard review with status updates
+- [x] SQLite persistence
+- [x] REST API for vocabulary CRUD
+- [x] Responsive UI, loading states, and error feedback
+- [x] Basic keyboard and form accessibility
+
+## Roadmap
+
+### Version 2
+
+- [ ] Automatic dictionary lookup
+- [ ] Pronunciation
+- [ ] Image suggestions
+- [ ] Improved vocabulary import
+
+### Version 3
+
+- [ ] OCR image import
+- [ ] AI-assisted vocabulary extraction
+- [ ] Spaced repetition
+- [ ] Learning statistics
+
+## Screenshots
+
+Add portfolio screenshots at the paths below.
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+![Vocabulary](docs/screenshots/vocabulary.png)
+
+![Add Words](docs/screenshots/add-words.png)
+
+![Review](docs/screenshots/review.png)
+
+## Author
+
+Do Thanh Nhan
