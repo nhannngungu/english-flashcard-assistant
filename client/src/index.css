@@ -258,3 +258,42 @@ th {
   display: flex;
   gap: 0.75rem;
 }
+
+.dashboard {
+  display: grid;
+  gap: 1.75rem;
+}
+
+.stat-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.stat-card {
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.stat-card p {
+  color: #4b5563;
+  font-size: 0.9rem;
+  margin: 0 0 0.5rem;
+}
+
+.stat-card strong {
+  color: #1d4ed8;
+  font-size: 1.75rem;
+}
+
+.dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.recent-vocabulary h3 {
+  margin-top: 0;
+}

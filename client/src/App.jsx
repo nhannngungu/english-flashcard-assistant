@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Navigation from './components/Navigation.jsx'
 import AddWordsPage from './pages/AddWordsPage.jsx'
+import DashboardPage from './pages/DashboardPage.jsx'
 import ReviewPage from './pages/ReviewPage.jsx'
 import VocabularyPage from './pages/VocabularyPage.jsx'
 
@@ -21,7 +22,7 @@ function App() {
   } else if (activePage === 'review') {
     pageContent = <ReviewPage />
   } else {
-    pageContent = <p className="message">Welcome! Start by adding a vocabulary word.</p>
+    pageContent = <DashboardPage onNavigate={setActivePage} />
   }
 
   return (
