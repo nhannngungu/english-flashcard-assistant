@@ -175,6 +175,19 @@ th {
   white-space: nowrap;
 }
 
+.pronunciation-control {
+  align-items: start;
+  display: grid;
+  gap: 0.35rem;
+  justify-items: start;
+}
+
+.pronunciation-error {
+  color: #b91c1c;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
 .lookup-sources {
   color: #4b5563;
   font-size: 0.9rem;

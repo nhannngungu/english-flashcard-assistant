@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getVocabularies, updateVocabularyStatus } from '../api/vocabularies.js'
+import PronunciationButton from '../components/PronunciationButton.jsx'
 import { getEnglishDefinition, getVietnameseMeaning } from '../utils/vocabulary.js'
 
 function ReviewPage() {
@@ -78,6 +79,7 @@ function ReviewPage() {
         <p className="flashcard-label">Word</p>
         <h3>{currentCard.word}</h3>
         {currentCard.part_of_speech && <p className="part-of-speech">{currentCard.part_of_speech}</p>}
+        <PronunciationButton audioUrl={currentCard.audio_url} word={currentCard.word} />
 
         {isRevealed && (
           <div className="flashcard-answer">

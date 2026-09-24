@@ -90,7 +90,13 @@ function AddWordsPage({ onVocabularyCreated }) {
 
   return (
     <form className="word-form" onSubmit={handleSubmit}>
-      <VocabularyFormFields form={form} isLookingUp={isLookingUp} onChange={handleChange} onLookup={handleLookup} />
+      <VocabularyFormFields
+        form={form}
+        isLookingUp={isLookingUp}
+        onChange={handleChange}
+        onLookup={handleLookup}
+        showPronunciation
+      />
 
       {(dictionarySource || translationSource) && (
         <div className="lookup-sources" role="status">

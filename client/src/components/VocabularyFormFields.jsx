@@ -1,4 +1,6 @@
-function VocabularyFormFields({ form, isLookingUp = false, onChange, onLookup }) {
+import PronunciationButton from './PronunciationButton.jsx'
+
+function VocabularyFormFields({ form, isLookingUp = false, onChange, onLookup, showPronunciation = false }) {
   return (
     <>
       <div className="form-field">
@@ -11,6 +13,7 @@ function VocabularyFormFields({ form, isLookingUp = false, onChange, onLookup })
             </button>
           )}
         </div>
+        {showPronunciation && <PronunciationButton audioUrl={form.audio_url} word={form.word} />}
       </div>
 
       <div className="form-field">
