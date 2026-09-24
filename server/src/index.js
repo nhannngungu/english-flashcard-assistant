@@ -1,5 +1,6 @@
 import express from 'express'
 import db from './database.js'
+import dictionaryRoutes from './routes/dictionary.js'
 import vocabularyRoutes from './routes/vocabularies.js'
 
 const app = express()
@@ -18,6 +19,7 @@ app.get('/api/health', (request, response) => {
 })
 
 app.use('/api/vocabularies', vocabularyRoutes)
+app.use('/api/dictionary', dictionaryRoutes)
 
 app.use((error, request, response, next) => {
   if (error instanceof SyntaxError && 'body' in error) {
