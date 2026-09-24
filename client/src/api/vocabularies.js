@@ -46,3 +46,13 @@ export async function deleteVocabulary(id) {
 
   return readJson(response)
 }
+
+export async function updateVocabularyStatus(id, status) {
+  const response = await fetch(`${vocabularyApiUrl}/${id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  })
+
+  return readJson(response)
+}

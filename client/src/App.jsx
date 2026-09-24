@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Navigation from './components/Navigation.jsx'
 import AddWordsPage from './pages/AddWordsPage.jsx'
+import ReviewPage from './pages/ReviewPage.jsx'
 import VocabularyPage from './pages/VocabularyPage.jsx'
 
 function App() {
@@ -18,7 +19,7 @@ function App() {
   } else if (activePage === 'add-words') {
     pageContent = <AddWordsPage onVocabularyCreated={handleVocabularyCreated} />
   } else if (activePage === 'review') {
-    pageContent = <p className="message">Review will be added in a future step.</p>
+    pageContent = <ReviewPage />
   } else {
     pageContent = <p className="message">Welcome! Start by adding a vocabulary word.</p>
   }

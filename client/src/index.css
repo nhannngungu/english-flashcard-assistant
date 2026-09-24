@@ -203,3 +203,58 @@ th {
 .edit-form h3 {
   margin: 0;
 }
+
+.review-section {
+  max-width: 640px;
+}
+
+.review-progress {
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.flashcard {
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  min-height: 180px;
+  padding: 2rem;
+}
+
+.flashcard-label {
+  color: #6b7280;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.flashcard h3 {
+  font-size: 2rem;
+  margin: 0.5rem 0;
+}
+
+.part-of-speech {
+  color: #4b5563;
+  font-style: italic;
+}
+
+.flashcard-answer {
+  border-top: 1px solid #e5e7eb;
+  line-height: 1.5;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+}
+
+.flashcard-image {
+  border-radius: 6px;
+  display: block;
+  margin-top: 1rem;
+  max-height: 240px;
+  max-width: 100%;
+}
+
+.review-actions {
+  display: flex;
+  gap: 0.75rem;
+}
