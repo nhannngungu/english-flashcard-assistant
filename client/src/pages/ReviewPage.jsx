@@ -11,6 +11,7 @@ function ReviewPage() {
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
   const [isUpdating, setIsUpdating] = useState(false)
+  const [imageLoadFailed, setImageLoadFailed] = useState(false)
 
   useEffect(() => {
     async function loadReviewCards() {
@@ -32,6 +33,10 @@ function ReviewPage() {
 
     loadReviewCards()
   }, [])
+
+  useEffect(() => {
+    setImageLoadFailed(false)
+  }, [currentIndex])
 
   async function rateCard(status) {
     const currentCard = cards[currentIndex]
@@ -68,6 +73,7 @@ function ReviewPage() {
   const currentCard = cards[currentIndex]
   const vietnameseMeaning = getVietnameseMeaning(currentCard)
   const englishDefinition = getEnglishDefinition(currentCard)
+  const hasImage = Boolean(currentCard.image_url) && !imageLoadFailed
 
   return (
     <section className="review-section">
@@ -76,13 +82,40 @@ function ReviewPage() {
       </p>
 
       <article className="flashcard">
-        <p className="flashcard-label">Word</p>
-        <h3>{currentCard.word}</h3>
-        {currentCard.part_of_speech && <p className="part-of-speech">{currentCard.part_of_speech}</p>}
-        <PronunciationButton audioUrl={currentCard.audio_url} word={currentCard.word} />
+        {!isRevealed && hasImage && (
+          <>
+            <p className="flashcard-label">What is this?</p>
+            <img
+              alt="Vocabulary image"
+              className="flashcard-image flashcard-image-front"
+              onError={() => setImageLoadFailed(true)}
+              src={currentCard.image_url}
+            />
+          </>
+        )}
+
+        {!isRevealed && !hasImage && (
+          <>
+            <p className="flashcard-label">Word</p>
+            <h3>{currentCard.word}</h3>
+          </>
+        )}
 
         {isRevealed && (
           <div className="flashcard-answer">
+            {hasImage && (
+              <img
+                alt={`Illustration for ${currentCard.word}`}
+                className="flashcard-image"
+                onError={() => setImageLoadFailed(true)}
+                src={currentCard.image_url}
+              />
+            )}
+            <p className="flashcard-label">Answer</p>
+            <h3>{currentCard.word}</h3>
+            <PronunciationButton audioUrl={currentCard.audio_url} word={currentCard.word} />
+            {currentCard.phonetic && <p className="phonetic">{currentCard.phonetic}</p>}
+            {currentCard.part_of_speech && <p className="part-of-speech">{currentCard.part_of_speech}</p>}
             <p className="flashcard-primary-meaning">
               <strong>Vietnamese Meaning:</strong> {vietnameseMeaning || 'No Vietnamese meaning added.'}
             </p>
@@ -95,9 +128,6 @@ function ReviewPage() {
               <p>
                 <strong>Example:</strong> {currentCard.example}
               </p>
-            )}
-            {currentCard.image_url && (
-              <img alt={`Illustration for ${currentCard.word}`} className="flashcard-image" src={currentCard.image_url} />
             )}
           </div>
         )}

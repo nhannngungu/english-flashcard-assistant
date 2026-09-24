@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { createVocabulary, lookupDictionary } from '../api/vocabularies.js'
+import { createVocabulary, lookupDictionary, lookupImages } from '../api/vocabularies.js'
+import ImageSuggestions from '../components/ImageSuggestions.jsx'
 import VocabularyFormFields from '../components/VocabularyFormFields.jsx'
 
 const initialForm = {
@@ -23,6 +24,12 @@ function AddWordsPage({ onVocabularyCreated }) {
   const [lookupError, setLookupError] = useState('')
   const [dictionarySource, setDictionarySource] = useState('')
   const [translationSource, setTranslationSource] = useState('')
+  const [canFindImages, setCanFindImages] = useState(false)
+  const [imageSuggestions, setImageSuggestions] = useState([])
+  const [isFindingImages, setIsFindingImages] = useState(false)
+  const [hasSearchedImages, setHasSearchedImages] = useState(false)
+  const [imageLookupError, setImageLookupError] = useState('')
+  const [imageSearchPage, setImageSearchPage] = useState(1)
 
   function handleChange(event) {
     const { name, value } = event.target
@@ -31,6 +38,11 @@ function AddWordsPage({ onVocabularyCreated }) {
       setLookupError('')
       setDictionarySource('')
       setTranslationSource('')
+      setCanFindImages(false)
+      setImageSuggestions([])
+      setHasSearchedImages(false)
+      setImageLookupError('')
+      setImageSearchPage(1)
     }
 
     setForm((currentForm) => ({ ...currentForm, [name]: value }))
@@ -41,6 +53,11 @@ function AddWordsPage({ onVocabularyCreated }) {
     setLookupError('')
     setDictionarySource('')
     setTranslationSource('')
+    setCanFindImages(false)
+    setImageSuggestions([])
+    setHasSearchedImages(false)
+    setImageLookupError('')
+    setImageSearchPage(1)
 
     try {
       const dictionaryEntry = await lookupDictionary(form.word)
@@ -56,6 +73,7 @@ function AddWordsPage({ onVocabularyCreated }) {
       }))
       setDictionarySource(dictionaryEntry.source || '')
       setTranslationSource(dictionaryEntry.translation_source || '')
+      setCanFindImages(true)
     } catch (requestError) {
       if (requestError.status === 404) {
         setLookupError('Word not found. You can still enter the information manually.')
@@ -65,6 +83,33 @@ function AddWordsPage({ onVocabularyCreated }) {
     } finally {
       setIsLookingUp(false)
     }
+  }
+
+  async function handleFindImages() {
+    setIsFindingImages(true)
+    setHasSearchedImages(false)
+    setImageLookupError('')
+    setImageSuggestions([])
+    const page = hasSearchedImages ? (imageSearchPage % 5) + 1 : imageSearchPage
+
+    try {
+      const images = await lookupImages(form.word, {
+        partOfSpeech: form.part_of_speech,
+        meaningEn: form.meaning_en,
+        page,
+      })
+      setImageSuggestions(images)
+      setHasSearchedImages(true)
+      setImageSearchPage(page)
+    } catch {
+      setImageLookupError('Image suggestions are unavailable. You can still enter an Image URL manually.')
+    } finally {
+      setIsFindingImages(false)
+    }
+  }
+
+  function handleImageSelect(image) {
+    setForm((currentForm) => ({ ...currentForm, image_url: image.image_url }))
   }
 
   async function handleSubmit(event) {
@@ -79,6 +124,11 @@ function AddWordsPage({ onVocabularyCreated }) {
       setDictionarySource('')
       setTranslationSource('')
       setLookupError('')
+      setCanFindImages(false)
+      setImageSuggestions([])
+      setHasSearchedImages(false)
+      setImageLookupError('')
+      setImageSearchPage(1)
       setMessage(`“${vocabulary.word}” was added successfully.`)
       onVocabularyCreated()
     } catch (requestError) {
@@ -105,6 +155,36 @@ function AddWordsPage({ onVocabularyCreated }) {
         </div>
       )}
       {lookupError && <p className="message error-message" role="alert">{lookupError}</p>}
+
+      {canFindImages && (
+        <section className="image-suggestion-section" aria-labelledby="image-suggestions-title">
+          <div className="image-suggestion-heading">
+            <h3 id="image-suggestions-title">Image Suggestions</h3>
+            <button
+              className="secondary-button"
+              disabled={isFindingImages}
+              onClick={handleFindImages}
+              type="button"
+            >
+              {isFindingImages ? 'Finding images…' : hasSearchedImages ? 'Refresh Images' : 'Find Images'}
+            </button>
+          </div>
+
+          {imageSuggestions.length > 0 && (
+            <ImageSuggestions
+              images={imageSuggestions}
+              onSelect={handleImageSelect}
+              selectedUrl={form.image_url}
+            />
+          )}
+          {hasSearchedImages && imageSuggestions.length === 0 && (
+            <p className="message">
+              No good image suggestions were found. This word may be abstract or ambiguous. You can still enter an Image URL manually.
+            </p>
+          )}
+          {imageLookupError && <p className="message error-message" role="alert">{imageLookupError}</p>}
+        </section>
+      )}
 
       <button className="primary-button" disabled={isSubmitting} type="submit">
         {isSubmitting ? 'Adding…' : 'Add word'}

@@ -1,7 +1,17 @@
 import express from 'express'
+import { fileURLToPath } from 'node:url'
 import db from './database.js'
 import dictionaryRoutes from './routes/dictionary.js'
+import imageRoutes from './routes/images.js'
 import vocabularyRoutes from './routes/vocabularies.js'
+
+try {
+  process.loadEnvFile(fileURLToPath(new URL('../.env', import.meta.url)))
+} catch (error) {
+  if (error.code !== 'ENOENT') {
+    console.warn(`Could not load server/.env: ${error.message}`)
+  }
+}
 
 const app = express()
 const port = process.env.PORT || 3000
@@ -20,6 +30,7 @@ app.get('/api/health', (request, response) => {
 
 app.use('/api/vocabularies', vocabularyRoutes)
 app.use('/api/dictionary', dictionaryRoutes)
+app.use('/api/images', imageRoutes)
 
 app.use((error, request, response, next) => {
   if (error instanceof SyntaxError && 'body' in error) {

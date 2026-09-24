@@ -72,3 +72,13 @@ export function updateVocabularyStatus(id, status) {
 export function lookupDictionary(word) {
   return request(`/api/dictionary/${encodeURIComponent(word.trim())}`)
 }
+
+export function lookupImages(word, { partOfSpeech = '', meaningEn = '', page = 1 } = {}) {
+  const query = new URLSearchParams({
+    part_of_speech: partOfSpeech,
+    meaning_en: meaningEn,
+    page: String(page),
+  })
+
+  return request(`/api/images/${encodeURIComponent(word.trim())}?${query}`)
+}
