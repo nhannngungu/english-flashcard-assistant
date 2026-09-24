@@ -8,8 +8,147 @@ body {
   margin: 0;
 }
 
-main {
-  max-width: 720px;
-  margin: 4rem auto;
+.app-shell {
+  max-width: 960px;
+  margin: 0 auto;
   padding: 0 1.5rem;
+}
+
+.app-header {
+  padding: 2rem 0 1rem;
+}
+
+h1,
+h2 {
+  margin-top: 0;
+}
+
+.navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.navigation-link,
+.primary-button {
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.65rem 1rem;
+}
+
+.navigation-link {
+  background: transparent;
+  color: #374151;
+}
+
+.navigation-link:hover,
+.navigation-link.active {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.page-content {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+}
+
+.message {
+  line-height: 1.5;
+}
+
+.error-message {
+  color: #b91c1c;
+}
+
+.success-message {
+  color: #15803d;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  min-width: 620px;
+  width: 100%;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.85rem;
+  text-align: left;
+}
+
+th {
+  background: #f8fafc;
+}
+
+.status {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.6rem;
+}
+
+.status-new {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-learning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-learned {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.word-form {
+  display: grid;
+  gap: 1rem;
+  max-width: 620px;
+}
+
+.word-form label {
+  display: grid;
+  font-weight: 600;
+  gap: 0.4rem;
+}
+
+.word-form input,
+.word-form select,
+.word-form textarea {
+  border: 1px solid #9ca3af;
+  border-radius: 5px;
+  font: inherit;
+  font-weight: 400;
+  padding: 0.65rem;
+}
+
+.word-form textarea {
+  resize: vertical;
+}
+
+.primary-button {
+  background: #2563eb;
+  color: #ffffff;
+  justify-self: start;
+}
+
+.primary-button:hover {
+  background: #1d4ed8;
+}
+
+.primary-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
