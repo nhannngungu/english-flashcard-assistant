@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { deleteVocabulary, getVocabularies, updateVocabulary } from '../api/vocabularies.js'
+import VocabularyFormFields from '../components/VocabularyFormFields.jsx'
 
 function createEditForm(vocabulary) {
   return {
@@ -95,49 +96,22 @@ function VocabularyPage({ refreshKey }) {
   }
 
   if (isLoading) {
-    return <p className="message">Loading vocabulary…</p>
+    return <p className="message" role="status">Loading vocabulary…</p>
   }
 
   if (error) {
-    return <p className="message error-message">Could not load vocabulary: {error}</p>
+    return <p className="message error-message" role="alert">Could not load vocabulary: {error}</p>
   }
 
   return (
     <>
-      {message && <p className="message success-message">{message}</p>}
-      {actionError && <p className="message error-message">Could not complete action: {actionError}</p>}
+      {message && <p className="message success-message" role="status">{message}</p>}
+      {actionError && <p className="message error-message" role="alert">Could not complete action: {actionError}</p>}
 
       {editingVocabulary && (
         <form className="word-form edit-form" onSubmit={saveEdit}>
           <h3>Edit “{editingVocabulary.word}”</h3>
-          <label>
-            Word
-            <input name="word" onChange={handleEditChange} required value={editForm.word} />
-          </label>
-          <label>
-            Meaning
-            <input name="meaning" onChange={handleEditChange} value={editForm.meaning} />
-          </label>
-          <label>
-            Part of Speech
-            <input name="part_of_speech" onChange={handleEditChange} value={editForm.part_of_speech} />
-          </label>
-          <label>
-            Example
-            <textarea name="example" onChange={handleEditChange} rows="3" value={editForm.example} />
-          </label>
-          <label>
-            Image URL
-            <input name="image_url" onChange={handleEditChange} type="url" value={editForm.image_url} />
-          </label>
-          <label>
-            Status
-            <select name="status" onChange={handleEditChange} value={editForm.status}>
-              <option value="new">New</option>
-              <option value="learning">Learning</option>
-              <option value="learned">Learned</option>
-            </select>
-          </label>
+          <VocabularyFormFields form={editForm} onChange={handleEditChange} />
           <div className="form-actions">
             <button className="primary-button" disabled={isSaving} type="submit">
               {isSaving ? 'Saving…' : 'Save changes'}
@@ -159,13 +133,14 @@ function VocabularyPage({ refreshKey }) {
       ) : (
         <div className="table-wrapper">
           <table>
+            <caption className="sr-only">All vocabulary items</caption>
             <thead>
               <tr>
-                <th>Word</th>
-                <th>Meaning</th>
-                <th>Part of Speech</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th scope="col">Word</th>
+                <th scope="col">Meaning</th>
+                <th scope="col">Part of Speech</th>
+                <th scope="col">Status</th>
+                <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody>

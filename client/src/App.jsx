@@ -5,6 +5,13 @@ import DashboardPage from './pages/DashboardPage.jsx'
 import ReviewPage from './pages/ReviewPage.jsx'
 import VocabularyPage from './pages/VocabularyPage.jsx'
 
+const pageTitles = {
+  dashboard: 'Dashboard',
+  vocabulary: 'Vocabulary',
+  'add-words': 'Add Words',
+  review: 'Review',
+}
+
 function App() {
   const [activePage, setActivePage] = useState('dashboard')
   const [vocabularyRefreshKey, setVocabularyRefreshKey] = useState(0)
@@ -32,7 +39,7 @@ function App() {
         <Navigation activePage={activePage} onNavigate={setActivePage} />
       </header>
       <main className="page-content">
-        <h2>{activePage === 'add-words' ? 'Add Words' : activePage[0].toUpperCase() + activePage.slice(1)}</h2>
+        <h2>{pageTitles[activePage]}</h2>
         {pageContent}
       </main>
     </div>

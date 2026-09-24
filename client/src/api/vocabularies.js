@@ -5,7 +5,13 @@ async function readJson(response) {
     return null
   }
 
-  const data = await response.json()
+  let data
+
+  try {
+    data = await response.json()
+  } catch {
+    throw new Error(`The server returned an unexpected response (${response.status}).`)
+  }
 
   if (!response.ok) {
     throw new Error(data.error || 'Something went wrong. Please try again.')
@@ -14,45 +20,49 @@ async function readJson(response) {
   return data
 }
 
-export async function getVocabularies() {
-  const response = await fetch(vocabularyApiUrl)
-  return readJson(response)
+async function request(url, options) {
+  try {
+    const response = await fetch(url, options)
+    return readJson(response)
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error('Unable to reach the server. Check that the backend is running.')
+    }
+
+    throw error
+  }
 }
 
-export async function createVocabulary(vocabulary) {
-  const response = await fetch(vocabularyApiUrl, {
+export function getVocabularies() {
+  return request(vocabularyApiUrl)
+}
+
+export function createVocabulary(vocabulary) {
+  return request(vocabularyApiUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(vocabulary),
   })
-
-  return readJson(response)
 }
 
-export async function updateVocabulary(id, vocabulary) {
-  const response = await fetch(`${vocabularyApiUrl}/${id}`, {
+export function updateVocabulary(id, vocabulary) {
+  return request(`${vocabularyApiUrl}/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(vocabulary),
   })
-
-  return readJson(response)
 }
 
-export async function deleteVocabulary(id) {
-  const response = await fetch(`${vocabularyApiUrl}/${id}`, {
+export function deleteVocabulary(id) {
+  return request(`${vocabularyApiUrl}/${id}`, {
     method: 'DELETE',
   })
-
-  return readJson(response)
 }
 
-export async function updateVocabularyStatus(id, status) {
-  const response = await fetch(`${vocabularyApiUrl}/${id}/status`, {
+export function updateVocabularyStatus(id, status) {
+  return request(`${vocabularyApiUrl}/${id}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
   })
-
-  return readJson(response)
 }

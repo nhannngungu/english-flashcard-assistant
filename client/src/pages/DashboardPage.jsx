@@ -25,11 +25,11 @@ function DashboardPage({ onNavigate }) {
   }, [])
 
   if (isLoading) {
-    return <p className="message">Loading dashboard…</p>
+    return <p className="message" role="status">Loading dashboard…</p>
   }
 
   if (error) {
-    return <p className="message error-message">Could not load dashboard: {error}</p>
+    return <p className="message error-message" role="alert">Could not load dashboard: {error}</p>
   }
 
   const statistics = vocabularies.reduce(
@@ -89,11 +89,12 @@ function DashboardPage({ onNavigate }) {
         ) : (
           <div className="table-wrapper">
             <table>
+              <caption className="sr-only">Five most recently created vocabulary items</caption>
               <thead>
                 <tr>
-                  <th>Word</th>
-                  <th>Meaning</th>
-                  <th>Status</th>
+                  <th scope="col">Word</th>
+                  <th scope="col">Meaning</th>
+                  <th scope="col">Status</th>
                 </tr>
               </thead>
               <tbody>

@@ -48,19 +48,19 @@ function ReviewPage() {
   }
 
   if (isLoading) {
-    return <p className="message">Loading review cards…</p>
+    return <p className="message" role="status">Loading review cards…</p>
   }
 
   if (error) {
-    return <p className="message error-message">Could not load review cards: {error}</p>
+    return <p className="message error-message" role="alert">Could not load review cards: {error}</p>
   }
 
   if (cards.length === 0) {
-    return <p className="message success-message">You’re all caught up! There are no words to review.</p>
+    return <p className="message success-message" role="status">You’re all caught up! There are no words to review.</p>
   }
 
   if (currentIndex >= cards.length) {
-    return <p className="message success-message">Great work! You completed this review session.</p>
+    return <p className="message success-message" role="status">Great work! You completed this review session.</p>
   }
 
   const currentCard = cards[currentIndex]
@@ -93,7 +93,7 @@ function ReviewPage() {
         )}
       </article>
 
-      {actionError && <p className="message error-message">Could not update status: {actionError}</p>}
+      {actionError && <p className="message error-message" role="alert">Could not update status: {actionError}</p>}
 
       {!isRevealed ? (
         <button className="primary-button" onClick={() => setIsRevealed(true)} type="button">

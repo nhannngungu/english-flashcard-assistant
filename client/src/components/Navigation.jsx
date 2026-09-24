@@ -11,6 +11,7 @@ function Navigation({ activePage, onNavigate }) {
       {navigationItems.map((item) => (
         <button
           className={activePage === item.id ? 'navigation-link active' : 'navigation-link'}
+          aria-current={activePage === item.id ? 'page' : undefined}
           key={item.id}
           onClick={() => onNavigate(item.id)}
           type="button"

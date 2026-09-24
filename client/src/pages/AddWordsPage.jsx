@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createVocabulary } from '../api/vocabularies.js'
+import VocabularyFormFields from '../components/VocabularyFormFields.jsx'
 
 const initialForm = {
   word: '',
@@ -41,46 +42,14 @@ function AddWordsPage({ onVocabularyCreated }) {
 
   return (
     <form className="word-form" onSubmit={handleSubmit}>
-      <label>
-        Word
-        <input name="word" onChange={handleChange} required value={form.word} />
-      </label>
-
-      <label>
-        Meaning
-        <input name="meaning" onChange={handleChange} value={form.meaning} />
-      </label>
-
-      <label>
-        Part of Speech
-        <input name="part_of_speech" onChange={handleChange} value={form.part_of_speech} />
-      </label>
-
-      <label>
-        Example
-        <textarea name="example" onChange={handleChange} rows="3" value={form.example} />
-      </label>
-
-      <label>
-        Image URL
-        <input name="image_url" onChange={handleChange} type="url" value={form.image_url} />
-      </label>
-
-      <label>
-        Status
-        <select name="status" onChange={handleChange} value={form.status}>
-          <option value="new">New</option>
-          <option value="learning">Learning</option>
-          <option value="learned">Learned</option>
-        </select>
-      </label>
+      <VocabularyFormFields form={form} onChange={handleChange} />
 
       <button className="primary-button" disabled={isSubmitting} type="submit">
         {isSubmitting ? 'Adding…' : 'Add word'}
       </button>
 
-      {message && <p className="message success-message">{message}</p>}
-      {error && <p className="message error-message">Could not add word: {error}</p>}
+      {message && <p className="message success-message" role="status">{message}</p>}
+      {error && <p className="message error-message" role="alert">Could not add word: {error}</p>}
     </form>
   )
 }
