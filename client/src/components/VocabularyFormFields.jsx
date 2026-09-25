@@ -1,9 +1,16 @@
 import PronunciationButton from './PronunciationButton.jsx'
 
-function VocabularyFormFields({ form, isLookingUp = false, onChange, onLookup, showPronunciation = false }) {
+function VocabularyFormFields({
+  form,
+  isLookingUp = false,
+  layout = 'stacked',
+  onChange,
+  onLookup,
+  showPronunciation = false,
+}) {
   return (
-    <>
-      <div className="form-field">
+    <div className={`vocabulary-fields vocabulary-fields-${layout}`}>
+      <div className="form-field field-full">
         <label htmlFor="word">Word <span aria-hidden="true">*</span></label>
         <div className="word-lookup-control">
           <input id="word" name="word" onChange={onChange} required value={form.word} />
@@ -36,7 +43,7 @@ function VocabularyFormFields({ form, isLookingUp = false, onChange, onLookup, s
         <input id="part_of_speech" name="part_of_speech" onChange={onChange} value={form.part_of_speech} />
       </div>
 
-      <div className="form-field">
+      <div className="form-field field-full">
         <label htmlFor="example">Example</label>
         <textarea id="example" name="example" onChange={onChange} rows="3" value={form.example} />
       </div>
@@ -59,7 +66,7 @@ function VocabularyFormFields({ form, isLookingUp = false, onChange, onLookup, s
           <option value="learned">Learned</option>
         </select>
       </div>
-    </>
+    </div>
   )
 }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createVocabulary, lookupDictionary, lookupImages } from '../api/vocabularies.js'
+import BulkImportSection from '../components/BulkImportSection.jsx'
 import ImageSuggestions from '../components/ImageSuggestions.jsx'
 import VocabularyFormFields from '../components/VocabularyFormFields.jsx'
 
@@ -16,6 +17,7 @@ const initialForm = {
 }
 
 function AddWordsPage({ onVocabularyCreated }) {
+  const [mode, setMode] = useState('single')
   const [form, setForm] = useState(initialForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState('')
@@ -139,60 +141,106 @@ function AddWordsPage({ onVocabularyCreated }) {
   }
 
   return (
-    <form className="word-form" onSubmit={handleSubmit}>
-      <VocabularyFormFields
-        form={form}
-        isLookingUp={isLookingUp}
-        onChange={handleChange}
-        onLookup={handleLookup}
-        showPronunciation
-      />
+    <div className="add-words-layout">
+      <div className="add-mode-switch" role="tablist" aria-label="Add words mode">
+        <button
+          aria-selected={mode === 'single'}
+          aria-controls="single-word-panel"
+          className={`add-mode-button${mode === 'single' ? ' active' : ''}`}
+          id="single-word-tab"
+          onClick={() => setMode('single')}
+          role="tab"
+          type="button"
+        >
+          Single Word
+        </button>
+        <button
+          aria-selected={mode === 'bulk'}
+          aria-controls="bulk-import-panel"
+          className={`add-mode-button${mode === 'bulk' ? ' active' : ''}`}
+          id="bulk-import-tab"
+          onClick={() => setMode('bulk')}
+          role="tab"
+          type="button"
+        >
+          Bulk Import
+        </button>
+      </div>
 
-      {(dictionarySource || translationSource) && (
-        <div className="lookup-sources" role="status">
-          {dictionarySource && <p>Dictionary source: {dictionarySource}</p>}
-          {translationSource && <p>Translation source: {translationSource}</p>}
-        </div>
-      )}
-      {lookupError && <p className="message error-message" role="alert">{lookupError}</p>}
-
-      {canFindImages && (
-        <section className="image-suggestion-section" aria-labelledby="image-suggestions-title">
-          <div className="image-suggestion-heading">
-            <h3 id="image-suggestions-title">Image Suggestions</h3>
-            <button
-              className="secondary-button"
-              disabled={isFindingImages}
-              onClick={handleFindImages}
-              type="button"
-            >
-              {isFindingImages ? 'Finding images…' : hasSearchedImages ? 'Refresh Images' : 'Find Images'}
-            </button>
+      <section
+        aria-labelledby="single-word-tab"
+        className="single-word-panel"
+        hidden={mode !== 'single'}
+        id="single-word-panel"
+        role="tabpanel"
+      >
+        <div className="add-section-heading">
+          <div>
+            <h3 id="single-word-title">Add a single word</h3>
+            <p>Look up a word first, then review or adjust its details before adding it.</p>
           </div>
+        </div>
+        <form className="word-form" onSubmit={handleSubmit}>
+          <VocabularyFormFields
+            form={form}
+            isLookingUp={isLookingUp}
+            layout="two-column"
+            onChange={handleChange}
+            onLookup={handleLookup}
+            showPronunciation
+          />
 
-          {imageSuggestions.length > 0 && (
-            <ImageSuggestions
-              images={imageSuggestions}
-              onSelect={handleImageSelect}
-              selectedUrl={form.image_url}
-            />
+          {(dictionarySource || translationSource) && (
+            <div className="lookup-sources" role="status">
+              {dictionarySource && <p>Dictionary source: {dictionarySource}</p>}
+              {translationSource && <p>Translation source: {translationSource}</p>}
+            </div>
           )}
-          {hasSearchedImages && imageSuggestions.length === 0 && (
-            <p className="message">
-              No good image suggestions were found. This word may be abstract or ambiguous. You can still enter an Image URL manually.
-            </p>
+          {lookupError && <p className="message error-message" role="alert">{lookupError}</p>}
+
+          {canFindImages && (
+            <section className="image-suggestion-section" aria-labelledby="image-suggestions-title">
+              <div className="image-suggestion-heading">
+                <h3 id="image-suggestions-title">Image Suggestions</h3>
+                <button
+                  className={hasSearchedImages ? 'subtle-button' : 'secondary-button'}
+                  disabled={isFindingImages}
+                  onClick={handleFindImages}
+                  type="button"
+                >
+                  {isFindingImages ? 'Finding images…' : hasSearchedImages ? 'Refresh Images' : 'Find Images'}
+                </button>
+              </div>
+
+              {imageSuggestions.length > 0 && (
+                <ImageSuggestions
+                  images={imageSuggestions}
+                  onSelect={handleImageSelect}
+                  selectedUrl={form.image_url}
+                />
+              )}
+              {hasSearchedImages && imageSuggestions.length === 0 && (
+                <p className="message">
+                  No good image suggestions were found. This word may be abstract or ambiguous. You can still enter an Image URL manually.
+                </p>
+              )}
+              {imageLookupError && <p className="message error-message" role="alert">{imageLookupError}</p>}
+            </section>
           )}
-          {imageLookupError && <p className="message error-message" role="alert">{imageLookupError}</p>}
-        </section>
-      )}
 
-      <button className="primary-button" disabled={isSubmitting} type="submit">
-        {isSubmitting ? 'Adding…' : 'Add word'}
-      </button>
+          <button className="primary-button" disabled={isSubmitting} type="submit">
+            {isSubmitting ? 'Adding…' : 'Add Word'}
+          </button>
 
-      {message && <p className="message success-message" role="status">{message}</p>}
-      {error && <p className="message error-message" role="alert">Could not add word: {error}</p>}
-    </form>
+          {message && <p className="message success-message" role="status">{message}</p>}
+          {error && <p className="message error-message" role="alert">Could not add word: {error}</p>}
+        </form>
+      </section>
+
+      <div aria-labelledby="bulk-import-tab" hidden={mode !== 'bulk'} id="bulk-import-panel" role="tabpanel">
+        <BulkImportSection onVocabularyCreated={onVocabularyCreated} />
+      </div>
+    </div>
   )
 }
 
