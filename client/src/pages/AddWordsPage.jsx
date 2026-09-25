@@ -26,6 +26,7 @@ function AddWordsPage({ onVocabularyCreated }) {
   const [lookupError, setLookupError] = useState('')
   const [dictionarySource, setDictionarySource] = useState('')
   const [translationSource, setTranslationSource] = useState('')
+  const [translationNotice, setTranslationNotice] = useState('')
   const [canFindImages, setCanFindImages] = useState(false)
   const [imageSuggestions, setImageSuggestions] = useState([])
   const [isFindingImages, setIsFindingImages] = useState(false)
@@ -40,6 +41,7 @@ function AddWordsPage({ onVocabularyCreated }) {
       setLookupError('')
       setDictionarySource('')
       setTranslationSource('')
+      setTranslationNotice('')
       setCanFindImages(false)
       setImageSuggestions([])
       setHasSearchedImages(false)
@@ -55,6 +57,7 @@ function AddWordsPage({ onVocabularyCreated }) {
     setLookupError('')
     setDictionarySource('')
     setTranslationSource('')
+    setTranslationNotice('')
     setCanFindImages(false)
     setImageSuggestions([])
     setHasSearchedImages(false)
@@ -75,6 +78,9 @@ function AddWordsPage({ onVocabularyCreated }) {
       }))
       setDictionarySource(dictionaryEntry.source || '')
       setTranslationSource(dictionaryEntry.translation_source || '')
+      setTranslationNotice(
+        dictionaryEntry.meaning_vi ? '' : 'Vietnamese translation is unavailable. You can enter it manually.',
+      )
       setCanFindImages(true)
     } catch (requestError) {
       if (requestError.status === 404) {
@@ -125,6 +131,7 @@ function AddWordsPage({ onVocabularyCreated }) {
       setForm(initialForm)
       setDictionarySource('')
       setTranslationSource('')
+      setTranslationNotice('')
       setLookupError('')
       setCanFindImages(false)
       setImageSuggestions([])
@@ -142,25 +149,21 @@ function AddWordsPage({ onVocabularyCreated }) {
 
   return (
     <div className="add-words-layout">
-      <div className="add-mode-switch" role="tablist" aria-label="Add words mode">
+      <div className="add-mode-switch" aria-label="Add words mode">
         <button
-          aria-selected={mode === 'single'}
-          aria-controls="single-word-panel"
+          aria-pressed={mode === 'single'}
           className={`add-mode-button${mode === 'single' ? ' active' : ''}`}
           id="single-word-tab"
           onClick={() => setMode('single')}
-          role="tab"
           type="button"
         >
           Single Word
         </button>
         <button
-          aria-selected={mode === 'bulk'}
-          aria-controls="bulk-import-panel"
+          aria-pressed={mode === 'bulk'}
           className={`add-mode-button${mode === 'bulk' ? ' active' : ''}`}
           id="bulk-import-tab"
           onClick={() => setMode('bulk')}
-          role="tab"
           type="button"
         >
           Bulk Import
@@ -168,11 +171,10 @@ function AddWordsPage({ onVocabularyCreated }) {
       </div>
 
       <section
-        aria-labelledby="single-word-tab"
+        aria-labelledby="single-word-title"
         className="single-word-panel"
         hidden={mode !== 'single'}
         id="single-word-panel"
-        role="tabpanel"
       >
         <div className="add-section-heading">
           <div>
@@ -196,6 +198,7 @@ function AddWordsPage({ onVocabularyCreated }) {
               {translationSource && <p>Translation source: {translationSource}</p>}
             </div>
           )}
+          {translationNotice && <p className="message notice-message" role="status">{translationNotice}</p>}
           {lookupError && <p className="message error-message" role="alert">{lookupError}</p>}
 
           {canFindImages && (
@@ -237,7 +240,7 @@ function AddWordsPage({ onVocabularyCreated }) {
         </form>
       </section>
 
-      <div aria-labelledby="bulk-import-tab" hidden={mode !== 'bulk'} id="bulk-import-panel" role="tabpanel">
+      <div hidden={mode !== 'bulk'} id="bulk-import-panel">
         <BulkImportSection onVocabularyCreated={onVocabularyCreated} />
       </div>
     </div>

@@ -87,6 +87,14 @@ textarea:focus-visible {
   color: #15803d;
 }
 
+.notice-message {
+  background: #fffbeb;
+  border-left: 3px solid #f59e0b;
+  border-radius: 4px;
+  color: #92400e;
+  padding: 0.55rem 0.7rem;
+}
+
 .table-wrapper {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -576,6 +584,19 @@ th {
   width: 100%;
 }
 
+.image-preview-unavailable {
+  align-items: center;
+  aspect-ratio: 16 / 10;
+  background: #e5e7eb;
+  color: #4b5563;
+  display: flex;
+  font-size: 0.85rem;
+  height: 118px;
+  justify-content: center;
+  padding: 0.75rem;
+  text-align: center;
+}
+
 .image-suggestion-title,
 .image-suggestion-credit {
   margin: 0 0.65rem;
@@ -682,12 +703,16 @@ th {
   padding: 1.25rem;
 }
 
+.edit-form .vocabulary-fields {
+  max-width: 760px;
+}
+
 .edit-form h3 {
   margin: 0;
 }
 
 .review-section {
-  max-width: 640px;
+  max-width: 760px;
 }
 
 .review-progress {
@@ -696,6 +721,7 @@ th {
 }
 
 .flashcard {
+  background: #f8fafc;
   border: 1px solid #dbeafe;
   border-radius: 10px;
   margin-bottom: 1rem;
@@ -739,8 +765,14 @@ th {
 }
 
 .flashcard-image-front {
+  aspect-ratio: 4 / 3;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   margin: 1rem auto 0;
   max-height: 360px;
+  max-width: 520px;
+  object-fit: contain;
+  width: 100%;
 }
 
 .flashcard-answer .flashcard-image {
@@ -760,7 +792,7 @@ th {
 
 .dashboard {
   display: grid;
-  gap: 1.75rem;
+  gap: 1.25rem;
 }
 
 .stat-grid {
@@ -795,6 +827,11 @@ th {
 
 .recent-vocabulary h3 {
   margin-top: 0;
+}
+
+.recent-vocabulary {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 1.25rem;
 }
 
 .sr-only {
@@ -892,6 +929,10 @@ th {
     height: 112px;
   }
 
+  .image-preview-unavailable {
+    height: 112px;
+  }
+
   .bulk-edit-grid {
     grid-template-columns: 1fr;
   }
@@ -914,6 +955,10 @@ th {
 
   .flashcard h3 {
     font-size: 1.65rem;
+  }
+
+  .dashboard-actions button {
+    width: 100%;
   }
 
   .stat-grid {

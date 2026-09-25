@@ -31,6 +31,7 @@ function createPendingItem(word, index) {
     imageError: '',
     imageSearchPage: 1,
     expanded: false,
+    translationUnavailable: false,
     status: 'new',
     lookupStatus: 'pending',
     lookupError: '',
@@ -126,6 +127,7 @@ function BulkImportSection({ onVocabularyCreated }) {
         imageSuggestions: [],
         imageError: '',
         imageSearchPage: 1,
+        translationUnavailable: !result.meaning_vi,
         lookupStatus: 'success',
         lookupError: '',
         selected: true,
@@ -430,6 +432,11 @@ function BulkImportSection({ onVocabularyCreated }) {
                             </div>
                           ))}
                         </div>
+                        {item.translationUnavailable && (
+                          <p className="message notice-message" role="status">
+                            Vietnamese translation is unavailable. You can enter it manually.
+                          </p>
+                        )}
 
                         <section className="bulk-image-section" aria-label={`Image selection for ${item.word}`}>
                           <div className="bulk-image-heading">
