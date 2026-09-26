@@ -73,9 +73,10 @@ function imageStatusText(item) {
   return 'Image: Not selected'
 }
 
-function BulkImportSection({ onVocabularyCreated }) {
-  const [input, setInput] = useState('')
-  const [items, setItems] = useState([])
+function BulkImportSection({ initialWords = [], onVocabularyCreated = () => {} }) {
+  const initialInput = initialWords.join('\n')
+  const [input, setInput] = useState(initialInput)
+  const [items, setItems] = useState(() => parseBulkWords(initialInput).map(createPendingItem))
   const [inputError, setInputError] = useState('')
   const [isLookingUp, setIsLookingUp] = useState(false)
   const [isSaving, setIsSaving] = useState(false)

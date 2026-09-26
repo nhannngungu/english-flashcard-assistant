@@ -200,10 +200,41 @@ function firstExample(value) {
   return ''
 }
 
+export function getCrossReferenceTarget(value) {
+  const definition = cleanText(value)
+  const crossReferencePatterns = [
+    /^(?:(?:non-?oxford|oxford|british|american|canadian|australian|uk|us|regional|standard|nonstandard|alternative|alternate|obsolete)\s+)*(?:spelling|form) of\s+(.+?)[.!]?$/i,
+    /^(?:an?\s+)?(?:alternative|alternate|variant|obsolete)\s+(?:spelling|form)?\s*of\s+(.+?)[.!]?$/i,
+    /^(?:see|same as|compare)\s+(.+?)[.!]?$/i,
+  ]
+
+  for (const pattern of crossReferencePatterns) {
+    const match = definition.match(pattern)
+    const target = cleanText(match?.[1])
+
+    if (/^[A-Za-z]+(?:[ '\u2019-][A-Za-z]+)*$/.test(target)) {
+      return target
+    }
+  }
+
+  return ''
+}
+
+function isMetadataLikeDefinition(definition) {
+  return Boolean(getCrossReferenceTarget(definition)) ||
+    /^(?:used|chiefly used|formerly used)\b/i.test(definition) ||
+    /\b(?:etymology|derived from|borrowed from|from latin|from greek)\b/i.test(definition) ||
+    /^(?:plural|past tense|past participle|present participle) of\b/i.test(definition)
+}
+
 function scoreCandidate(candidate) {
   const metadata = [...candidate.tags, ...candidate.removedLabels].join(' ').toLowerCase()
   const definitionLength = candidate.definition.length
   let score = candidate.order * 3 + candidate.depth * 1.5
+
+  if (isMetadataLikeDefinition(candidate.definition)) {
+    score += 1_000
+  }
 
   if (includesLabel(metadata, stronglyDiscouragedLabels)) {
     score += 150
@@ -247,6 +278,42 @@ function scoreCandidate(candidate) {
   return score
 }
 
+export function selectLearnerDefinitionCandidates(candidates, limit = 3) {
+  const rankedCandidates = []
+  let order = 0
+
+  for (const rawCandidate of Array.isArray(candidates) ? candidates : []) {
+    const tags = Array.isArray(rawCandidate?.tags) ? rawCandidate.tags : []
+    const cleaned = cleanLearnerDefinition(rawCandidate?.definition, tags)
+    const definition = simplifyForPartOfSpeech(cleaned.definition, rawCandidate?.partOfSpeech)
+
+    if (!definition) continue
+
+    const candidate = {
+      definition,
+      depth: Number(rawCandidate?.depth) || 0,
+      example: firstExample(rawCandidate?.example),
+      order,
+      partOfSpeech: cleanText(rawCandidate?.partOfSpeech),
+      referenceWord: getCrossReferenceTarget(definition),
+      removedLabels: cleaned.removedLabels,
+      tags,
+    }
+    rankedCandidates.push({ ...candidate, score: scoreCandidate(candidate) })
+    order += 1
+  }
+
+  return rankedCandidates
+    .sort((first, second) => first.score - second.score || first.order - second.order)
+    .slice(0, limit)
+    .map(({ definition, example, partOfSpeech, referenceWord }) => ({
+      definition,
+      example,
+      partOfSpeech,
+      referenceWord,
+    }))
+}
+
 function collectCandidates(senses, partOfSpeech, candidates, state, depth = 0) {
   if (!Array.isArray(senses)) {
     return
@@ -262,6 +329,7 @@ function collectCandidates(senses, partOfSpeech, candidates, state, depth = 0) {
         definition: learnerDefinition,
         example: firstExample(sense.examples),
         partOfSpeech: cleanText(partOfSpeech),
+        referenceWord: getCrossReferenceTarget(learnerDefinition),
         tags,
         removedLabels: cleaned.removedLabels,
         depth,
@@ -287,5 +355,10 @@ export function selectFreeDictionaryApiCandidates(entries, limit = 3) {
   return candidates
     .sort((first, second) => first.score - second.score || first.order - second.order)
     .slice(0, limit)
-    .map(({ definition, example, partOfSpeech }) => ({ definition, example, partOfSpeech }))
+    .map(({ definition, example, partOfSpeech, referenceWord }) => ({
+      definition,
+      example,
+      partOfSpeech,
+      referenceWord,
+    }))
 }

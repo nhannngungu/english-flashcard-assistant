@@ -1,8 +1,10 @@
 import express from 'express'
 import { fileURLToPath } from 'node:url'
 import db from './database.js'
+import analysisRoutes from './routes/analysis.js'
 import dictionaryRoutes from './routes/dictionary.js'
 import imageRoutes from './routes/images.js'
+import importRoutes from './routes/imports.js'
 import vocabularyRoutes from './routes/vocabularies.js'
 
 try {
@@ -29,8 +31,10 @@ app.get('/api/health', (request, response) => {
 })
 
 app.use('/api/vocabularies', vocabularyRoutes)
+app.use('/api/analysis', analysisRoutes)
 app.use('/api/dictionary', dictionaryRoutes)
 app.use('/api/images', imageRoutes)
+app.use('/api/import', importRoutes)
 
 app.use((error, request, response, next) => {
   if (error instanceof SyntaxError && 'body' in error) {

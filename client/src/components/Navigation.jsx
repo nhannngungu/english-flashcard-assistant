@@ -2,6 +2,7 @@ const navigationItems = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'vocabulary', label: 'Vocabulary' },
   { id: 'add-words', label: 'Add Words' },
+  { id: 'import', label: 'Import' },
   { id: 'review', label: 'Review' },
 ]
 

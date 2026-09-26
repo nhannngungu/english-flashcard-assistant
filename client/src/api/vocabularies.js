@@ -69,8 +69,20 @@ export function updateVocabularyStatus(id, status) {
   })
 }
 
+export function normalizeVocabularyLookup(value) {
+  const normalizedValue = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : ''
+  const leadingBulletPattern = /^(?:[-–—•*·])+\s*/u
+  const trailingBulletPattern = /\s*(?:[-–—•*·])+$/u
+
+  return normalizedValue
+    .replace(leadingBulletPattern, '')
+    .replace(trailingBulletPattern, '')
+    .trim()
+}
+
 export function lookupDictionary(word) {
-  return request(`/api/dictionary/${encodeURIComponent(word.trim())}`)
+  const normalizedWord = normalizeVocabularyLookup(word)
+  return request(`/api/dictionary/${encodeURIComponent(normalizedWord)}`)
 }
 
 export function lookupImages(word, { partOfSpeech = '', meaningEn = '', page = 1 } = {}) {
