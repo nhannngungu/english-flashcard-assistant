@@ -1,164 +1,220 @@
 # English Flashcard Assistant
 
-A full-stack English vocabulary app for collecting words, enriching them with dictionary data, choosing helpful images, and reviewing flashcards with an image-first flow.
+English Flashcard Assistant is a full-stack vocabulary learning application that helps users import, analyze, organize, and review English vocabulary using contextual analysis and spaced repetition.
 
-## Version 2 Highlights
+## Version 3 at a glance
 
-- Smart dictionary enrichment with English definitions, Vietnamese meanings, phonetics, examples, and pronunciation
-- Image suggestions with Pexels plus Openverse and Wikimedia Commons fallbacks
-- Image-first flashcard review with word-first fallback when an image is unavailable
-- Bulk import with parsing, duplicate removal, three-request lookup concurrency, editable previews, and per-word image selection
-- Responsive Single Word and Bulk Import workflows with accessible controls and friendly error states
+### Smart Vocabulary Import
 
-## Features
+- Add individual vocabulary manually or with dictionary lookup.
+- Bulk-import words from lines, commas, or semicolons, then review editable results before saving.
+- Import PNG, JPG, JPEG, and WEBP vocabulary images.
+- Use OCR.space as the primary OCR provider (Engine 3 and table parsing) with Tesseract.js fallback.
+- Extract structured vocabulary rows and safely enrich only fields that are blank.
 
-- Dashboard with vocabulary and review progress totals
-- Vocabulary list with edit, delete, and learning-status management
-- Manual vocabulary creation or automatic dictionary lookup
-- Vietnamese and English meanings, pronunciation playback, examples, and parts of speech
-- Optional image suggestions and selected-image persistence
-- Bulk word preparation from new lines, commas, or semicolons
-- Per-item lookup, retry, selection, editing, image lookup, and save status in bulk import
-- SQLite persistence and REST API
+### CEFR and vocabulary analysis
 
-### Version 3.4 Vocabulary Recommendations
+- Analyze pasted text token by token with CEFR A1–C2 levels.
+- Highlight text, filter CEFR levels, and select vocabulary candidates.
+- Quickly select B2+ or C1+ vocabulary.
+- Rank recommended words and phrases into Recommended, Worth considering, and Lower priority groups.
 
-The CEFR analyzer can build a reviewable list of words and phrases before vocabulary preparation. Ranking always begins locally: B1–C1 vocabulary, repetition, useful unknown terms, meaningful length, and curated or conservatively repeated phrases receive positive weight. Existing vocabulary, very basic words, and grammatical stop words are reduced or excluded. The selected learning goal and target level adjust those weights without excluding other CEFR levels.
+### Context-aware vocabulary preparation
 
-AI ranking is optional. It can only rank the locally generated candidates and add a short reason; validated output cannot add terms, CEFR levels, definitions, examples, pronunciation, or saved records. If it is disabled or unavailable, the same UI continues with the deterministic score.
+- Rank dictionary senses against the source sentence and surrounding context.
+- Prepare editable English definitions, Vietnamese meanings, phonetics, parts of speech, and examples.
+- Review confidence and alternative meanings before saving.
 
-### Version 2 Feature Checklist
+### Vocabulary Sets
 
-- [x] Dictionary lookup and learner-friendly definitions
-- [x] Vietnamese translation fallback
-- [x] Pronunciation playback with speech-synthesis fallback
-- [x] Pexels image suggestions with Openverse/Wikimedia Commons fallbacks
-- [x] Image-first review cards with broken-image fallback
-- [x] Bulk import parsing and case-insensitive duplicate removal
-- [x] Limited-concurrency bulk lookup (maximum three requests)
-- [x] Per-word image selection before bulk saving
-- [x] Responsive Single Word / Bulk Import interface
-- [x] Error feedback and keyboard-focus support
+- Save batches from Bulk Import, Smart Import, or CEFR preparation into a review set.
+- Use a custom title and optional cover image; blank titles receive an automatic local-date title.
+- Review a specific set, browse compact set details, and paginate set cards.
 
-## Tech Stack
+### Spaced-repetition review
 
-- **Frontend:** React 18, Vite
+- Study due and new vocabulary in Smart Review.
+- Rate cards with Again, Hard, Good, or Easy.
+- Store the resulting interval, ease factor, next review time, and review history.
+- Use image-first flashcards where an image is available.
+
+### Learning statistics
+
+- See vocabulary totals by New, Learning, and Learned status.
+- Track due/reviewed-today counts, rating distribution, and seven-day activity.
+- Review upcoming work, recent activity, and recent vocabulary sets.
+
+### Vocabulary management
+
+- Edit or delete vocabulary and retain its learning status.
+- Browse vocabulary in 10, 20, or 50-row pages.
+
+## Tech stack
+
+- **Frontend:** React, Vite, JavaScript, CSS
 - **Backend:** Node.js, Express
 - **Database:** SQLite
-- **External services:** FreeDictionaryAPI, MyMemory Translation, Pexels, Openverse, and Wikimedia Commons
+- **External services:** OCR.space, Tesseract.js fallback, Pexels, dictionary providers, and a translation provider
 
-## Project Structure
+External services are called only from the backend. Browser code never receives provider secrets.
+
+## Project structure
 
 ```text
 english-flashcard-assistant/
-├── client/                     # React + Vite frontend
+├── client/
 │   └── src/
-│       ├── api/                # API client
-│       ├── components/         # Reusable UI components
-│       ├── pages/              # Dashboard, Vocabulary, Add Words, Review
-│       └── utils/              # Vocabulary and bulk-import helpers
-├── server/                     # Express + SQLite backend
+│       ├── api/                 # Backend API clients
+│       ├── components/          # Import, preparation, and reusable UI
+│       ├── pages/               # Dashboard, Import, Review, Vocabulary, Add Words
+│       └── utils/               # Text, bulk-import, and vocabulary helpers
+├── server/
 │   ├── src/
-│   │   ├── routes/             # Vocabulary, dictionary, and image endpoints
-│   │   ├── services/           # Translation and definition selection
-│   │   └── database.js         # SQLite initialization
-│   └── .env                    # Local secrets; do not commit
-├── docs/screenshots/           # Portfolio screenshots
+│   │   ├── data/cefr/           # Local CEFR datasets
+│   │   ├── routes/              # OCR, analysis, vocabulary, review-set, statistics APIs
+│   │   ├── services/            # CEFR, SRS, context, recommendation, and provider logic
+│   │   └── database.js          # SQLite initialization and safe migrations
+│   └── .env.example             # Environment-variable placeholders
+├── docs/screenshots/            # Project screenshots
+├── CHANGELOG.md
 └── README.md
 ```
 
-## How to Run
+## Installation
 
-Use two terminals from the repository root.
+```powershell
+git clone <repository-url>
+cd english-flashcard-assistant
+```
 
-1. Start the backend:
+Install the backend dependencies:
 
-   ```powershell
-   cd server
-   npm install
-   npm run dev
-   ```
+```powershell
+cd server
+npm install
+```
 
-   The API runs on `http://localhost:3000` by default.
+Install the frontend dependencies:
 
-2. Start the frontend:
+```powershell
+cd ../client
+npm install
+```
 
-   ```powershell
-   cd client
-   npm install
-   npm run dev
-   ```
-
-   Open the URL shown by Vite, usually `http://localhost:5173`. Frontend `/api` calls are proxied to the backend during development.
-
-## Environment Variables
-
-Create `server/.env` to enable optional providers:
+Copy `server/.env.example` to `server/.env`, then add the provider keys you intend to use. Provider-key placeholders include:
 
 ```dotenv
 PEXELS_API_KEY=your_pexels_api_key_here
 OCR_SPACE_API_KEY=your_ocr_space_api_key_here
-AI_RANKING_PROVIDER=openai
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_RANKING_MODEL=gpt-4o-mini
 ```
 
-Never commit `server/.env` or any real API key. The repository ignores `.env` files. A `server/.env.example` file containing placeholder values is safe to commit and share.
+Optional AI ranking settings are also documented in `server/.env.example`. Do not put real values in this README or any tracked file.
 
-Without a Pexels key, image lookup continues with Openverse and Wikimedia Commons fallbacks where available.
+## Run the application
 
-Without both `AI_RANKING_PROVIDER=openai` and an OpenAI API key, vocabulary recommendations use deterministic ranking only. The API key is read by the backend and is never sent to React.
+Use two terminals from the repository root.
 
-## External Services
+Start the backend:
 
-- **FreeDictionaryAPI:** primary English dictionary enrichment
-- **MyMemory Translation:** English-to-Vietnamese meaning translation
-- **Pexels:** optional image suggestions when `PEXELS_API_KEY` is configured
-- **Openverse / Wikimedia Commons:** public-image fallback providers
-- **OpenAI (optional):** one structured vocabulary-ranking request per passage after local candidate generation
+```powershell
+cd server
+npm run dev
+```
 
-External services are called by the backend only; the React client uses the app's API endpoints.
+The API listens on `http://localhost:3000` by default.
 
-## API Endpoints
+Start the frontend:
 
-Base URL: `http://localhost:3000`
+```powershell
+cd client
+npm run dev
+```
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| GET | `/api/health` | Check API and database availability |
-| GET | `/api/vocabularies` | List vocabulary items |
-| GET | `/api/vocabularies/:id` | Get one vocabulary item |
-| POST | `/api/vocabularies` | Create a vocabulary item |
-| PUT | `/api/vocabularies/:id` | Update a vocabulary item |
-| DELETE | `/api/vocabularies/:id` | Delete a vocabulary item |
-| PATCH | `/api/vocabularies/:id/status` | Update status to `new`, `learning`, or `learned` |
-| GET | `/api/dictionary/:word` | Look up dictionary, phonetic, translation, example, and audio data |
-| GET | `/api/images/:word` | Get image suggestions; accepts `meaning_en`, `part_of_speech`, and `page` query parameters |
-| POST | `/api/analysis/recommendations` | Generate deterministic vocabulary recommendations and optionally apply validated AI ranking |
+Open the Vite URL shown in the terminal, usually `http://localhost:5173`.
 
-## Version History
+## Testing
 
-- **v1.0.0 — Core flashcard system:** vocabulary CRUD, SQLite persistence, dashboard, statuses, and flashcard review.
-- **v2.0.0 — Smart vocabulary enrichment and bulk import:** dictionary and translation lookup, pronunciation, image suggestions, image-first review, and bulk vocabulary workflows.
+Run backend automated tests:
 
-## Roadmap
+```powershell
+cd server
+npm test
+```
 
-### Version 3
+Build the frontend for production:
 
-- [ ] OCR image import
-- [x] Optional AI-assisted vocabulary ranking and extraction review
-- [ ] Spaced repetition
-- [ ] Learning statistics
+```powershell
+cd client
+npm run build
+```
+
+Version 3 verification completed with **24 backend tests passing** and a successful frontend production build.
+
+## Version 3 workflow
+
+```text
+Import text or image
+  → Analyze CEFR
+  → Select or accept recommendations
+  → Prepare vocabulary using context
+  → Save to a Vocabulary Set
+  → Review with Smart Review or Review Sets
+  → Track progress in the Dashboard
+```
+
+## API overview
+
+The development API base URL is `http://localhost:3000`.
+
+| Area | Endpoint examples |
+| --- | --- |
+| Vocabulary | `GET/POST /api/vocabularies`, `PUT/DELETE /api/vocabularies/:id` |
+| Review | `GET /api/vocabularies/review/smart`, `POST /api/vocabularies/:id/review` |
+| Vocabulary sets | `GET/POST /api/vocabulary-sets`, `GET/PATCH /api/vocabulary-sets/:id` |
+| Import | `POST /api/import/ocr` |
+| Analysis | `POST /api/analysis/cefr`, `/recommendations`, `/prepare-vocabulary` |
+| Enrichment | `GET /api/dictionary/:word`, `GET /api/images/:word` |
+| Statistics | `GET /api/statistics/dashboard` |
 
 ## Screenshots
 
-![Version 2 Dashboard](docs/screenshots/v2-dashboard.png)
+Current tracked screenshots:
 
-![Version 2 Single Word](docs/screenshots/v2-single-word.png)
+![Dashboard](docs/screenshots/dashboard.png)
 
-![Version 2 Bulk Import](docs/screenshots/v2-bulk-import.png)
+![Add Words](docs/screenshots/add-words.png)
 
-![Version 2 Review](docs/screenshots/v2-review.png)
+![Flashcard Review](docs/screenshots/review.png)
+
+![Vocabulary Management](docs/screenshots/vocabulary.png)
+
+The following Version 3 captures still need to be created and added under `docs/screenshots/`:
+
+- Smart Import / OCR table review
+- CEFR Analyzer
+- Vocabulary Recommendations
+- Review Sets
+
+## Security
+
+- Store secrets only in `server/.env`.
+- `server/.env` is ignored by Git.
+- `server/.env.example` contains placeholders only.
+- OCR, image, dictionary, translation, and optional AI provider keys remain on the server.
+
+## Known limitations
+
+- Dictionary, translation, OCR, and image providers require internet access and may depend on third-party availability.
+- Authentication and multi-user support are not implemented.
+- The current SRS is deterministic and intentionally simple; advanced FSRS scheduling is not implemented.
+
+## Version history
+
+- **v1.0.0:** Core vocabulary CRUD and basic review.
+- **v2.0.0:** Dictionary enrichment, bilingual meanings, pronunciation, images, bulk import, and image-first flashcards.
+- **v3.0.0:** Smart OCR import, CEFR analysis, contextual enrichment, recommendations, vocabulary sets, spaced repetition, review history, statistics, pagination, and UX improvements.
+
+See [CHANGELOG.md](CHANGELOG.md) for Version 3 release notes.
 
 ## Author
 
