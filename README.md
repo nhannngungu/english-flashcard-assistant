@@ -176,24 +176,31 @@ The development API base URL is `http://localhost:3000`.
 | Enrichment | `GET /api/dictionary/:word`, `GET /api/images/:word` |
 | Statistics | `GET /api/statistics/dashboard` |
 
-## Screenshots
+## Version 3 Screenshots
 
-Current tracked screenshots:
+### Smart Import / OCR
 
-![Dashboard](docs/screenshots/dashboard.png)
+![Smart Import / OCR](docs/screenshots/v3-smart-import.png)
 
-![Add Words](docs/screenshots/add-words.png)
+### CEFR Analyzer
 
-![Flashcard Review](docs/screenshots/review.png)
+![CEFR Analyzer](docs/screenshots/v3-cefr-analyzer.png)
 
-![Vocabulary Management](docs/screenshots/vocabulary.png)
+### Vocabulary Recommendations
 
-The following Version 3 captures still need to be created and added under `docs/screenshots/`:
+`docs/screenshots/v3-recommendations.png` still needs to be added.
 
-- Smart Import / OCR table review
-- CEFR Analyzer
-- Vocabulary Recommendations
-- Review Sets
+### Review Sets
+
+![Review Sets](docs/screenshots/v3-review-sets.png)
+
+### Learning Statistics Dashboard
+
+![Learning Statistics Dashboard](docs/screenshots/v3-dashboard.png)
+
+### Smart Review / Spaced Repetition
+
+![Smart Review / Spaced Repetition](docs/screenshots/v3-smart-review.png)
 
 ## Security
 
