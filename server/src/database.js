@@ -135,16 +135,32 @@ db.serialize(() => {
       ON vocabularies(set_id)
     `)
 
-    db.run(
+    db.get(
       `
-        UPDATE vocabularies
-        SET meaning_en = meaning
+        SELECT COUNT(*) AS pending_count
+        FROM vocabularies
         WHERE TRIM(meaning_en) = '' AND TRIM(meaning) != ''
       `,
-      (migrationError) => {
-        if (migrationError) {
-          console.error('Could not migrate existing meanings to meaning_en.', migrationError)
+      (pendingCheckError, pendingRow) => {
+        if (pendingCheckError) {
+          console.error('Could not inspect existing meanings for migration.', pendingCheckError)
+          return
         }
+
+        if (Number(pendingRow?.pending_count) === 0) return
+
+        db.run(
+          `
+            UPDATE vocabularies
+            SET meaning_en = meaning
+            WHERE TRIM(meaning_en) = '' AND TRIM(meaning) != ''
+          `,
+          (migrationError) => {
+            if (migrationError) {
+              console.error('Could not migrate existing meanings to meaning_en.', migrationError)
+            }
+          },
+        )
       },
     )
   })
