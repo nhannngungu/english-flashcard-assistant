@@ -21,6 +21,12 @@ A full-stack English vocabulary app for collecting words, enriching them with di
 - Per-item lookup, retry, selection, editing, image lookup, and save status in bulk import
 - SQLite persistence and REST API
 
+### Version 3.4 Vocabulary Recommendations
+
+The CEFR analyzer can build a reviewable list of words and phrases before vocabulary preparation. Ranking always begins locally: B1–C1 vocabulary, repetition, useful unknown terms, meaningful length, and curated or conservatively repeated phrases receive positive weight. Existing vocabulary, very basic words, and grammatical stop words are reduced or excluded. The selected learning goal and target level adjust those weights without excluding other CEFR levels.
+
+AI ranking is optional. It can only rank the locally generated candidates and add a short reason; validated output cannot add terms, CEFR levels, definitions, examples, pronunciation, or saved records. If it is disabled or unavailable, the same UI continues with the deterministic score.
+
 ### Version 2 Feature Checklist
 
 - [x] Dictionary lookup and learner-friendly definitions
@@ -87,15 +93,21 @@ Use two terminals from the repository root.
 
 ## Environment Variables
 
-Create `server/.env` to enable Pexels suggestions:
+Create `server/.env` to enable optional providers:
 
 ```dotenv
 PEXELS_API_KEY=your_pexels_api_key_here
+OCR_SPACE_API_KEY=your_ocr_space_api_key_here
+AI_RANKING_PROVIDER=openai
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_RANKING_MODEL=gpt-4o-mini
 ```
 
 Never commit `server/.env` or any real API key. The repository ignores `.env` files. A `server/.env.example` file containing placeholder values is safe to commit and share.
 
 Without a Pexels key, image lookup continues with Openverse and Wikimedia Commons fallbacks where available.
+
+Without both `AI_RANKING_PROVIDER=openai` and an OpenAI API key, vocabulary recommendations use deterministic ranking only. The API key is read by the backend and is never sent to React.
 
 ## External Services
 
@@ -103,6 +115,7 @@ Without a Pexels key, image lookup continues with Openverse and Wikimedia Common
 - **MyMemory Translation:** English-to-Vietnamese meaning translation
 - **Pexels:** optional image suggestions when `PEXELS_API_KEY` is configured
 - **Openverse / Wikimedia Commons:** public-image fallback providers
+- **OpenAI (optional):** one structured vocabulary-ranking request per passage after local candidate generation
 
 External services are called by the backend only; the React client uses the app's API endpoints.
 
@@ -121,6 +134,7 @@ Base URL: `http://localhost:3000`
 | PATCH | `/api/vocabularies/:id/status` | Update status to `new`, `learning`, or `learned` |
 | GET | `/api/dictionary/:word` | Look up dictionary, phonetic, translation, example, and audio data |
 | GET | `/api/images/:word` | Get image suggestions; accepts `meaning_en`, `part_of_speech`, and `page` query parameters |
+| POST | `/api/analysis/recommendations` | Generate deterministic vocabulary recommendations and optionally apply validated AI ranking |
 
 ## Version History
 
@@ -132,7 +146,7 @@ Base URL: `http://localhost:3000`
 ### Version 3
 
 - [ ] OCR image import
-- [ ] AI-assisted vocabulary extraction
+- [x] Optional AI-assisted vocabulary ranking and extraction review
 - [ ] Spaced repetition
 - [ ] Learning statistics
 

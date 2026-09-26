@@ -21,6 +21,7 @@ function normalizedVocabularyKey(value) {
 
 function PreparedVocabularyCards({ initialItems, onVocabularyCreated = () => {} }) {
   const [items, setItems] = useState(() => initialItems.map(editableItem))
+  const [activeIndex, setActiveIndex] = useState(0)
   const [retryingId, setRetryingId] = useState('')
   const translationRevisions = useRef(new Map())
 
@@ -144,6 +145,12 @@ function PreparedVocabularyCards({ initialItems, onVocabularyCreated = () => {} 
     }
   }
 
+  const activeItem = items[activeIndex] || items[0]
+
+  function selectItem(index) {
+    if (index >= 0 && index < items.length) setActiveIndex(index)
+  }
+
   return (
     <section className="context-prepared" aria-labelledby="context-prepared-title">
       <div>
@@ -151,19 +158,42 @@ function PreparedVocabularyCards({ initialItems, onVocabularyCreated = () => {} 
         <p>Review the context-selected meanings. Saving remains a separate manual action.</p>
       </div>
 
-      <div className="context-card-list">
-        {items.map((item, index) => (
-          <article className={`context-card context-card-${item.status}`} key={item.id}>
+      {items.length > 1 && (
+        <>
+          <div className="prepared-word-list" aria-label="Prepared vocabulary list">
+            {items.map((item, index) => (
+              <button
+                aria-pressed={index === activeIndex}
+                className={`prepared-word-option${index === activeIndex ? ' active' : ''}`}
+                key={item.id}
+                onClick={() => selectItem(index)}
+                type="button"
+              >
+                {item.word || item.normalized || `Item ${index + 1}`}
+              </button>
+            ))}
+          </div>
+          <div className="prepared-card-navigation">
+            <button className="subtle-button" disabled={activeIndex === 0} onClick={() => selectItem(activeIndex - 1)} type="button">Previous</button>
+            <span>{activeIndex + 1} of {items.length}</span>
+            <button className="subtle-button" disabled={activeIndex === items.length - 1} onClick={() => selectItem(activeIndex + 1)} type="button">Next</button>
+          </div>
+        </>
+      )}
+
+      {activeItem && (
+        <div className="context-card-list">
+          <article className={`context-card context-card-${activeItem.status}`} key={activeItem.id}>
             <div className="context-card-heading">
               <div>
-                <h5>{item.word || item.normalized}</h5>
-                <span className="context-cefr">CEFR {item.cefr_level}</span>
+                <h5>{activeItem.word || activeItem.normalized}</h5>
+                <span className="context-cefr">CEFR {activeItem.cefr_level}</span>
               </div>
               <div className="context-card-statuses">
-                {item.existing && <span className="context-existing">Already in vocabulary</span>}
-                {item.status === 'prepared' && (
-                  <span className={`context-confidence confidence-${item.sense_confidence}`}>
-                    Sense confidence: {item.sense_confidence}
+                {activeItem.existing && <span className="context-existing">Already in vocabulary</span>}
+                {activeItem.status === 'prepared' && (
+                  <span className={`context-confidence confidence-${activeItem.sense_confidence}`}>
+                    Sense confidence: {activeItem.sense_confidence}
                   </span>
                 )}
               </div>
@@ -171,24 +201,24 @@ function PreparedVocabularyCards({ initialItems, onVocabularyCreated = () => {} 
 
             <div className="context-source-sentence">
               <strong>Original context</strong>
-              <blockquote>{item.sentence || 'No sentence context was available.'}</blockquote>
+              <blockquote>{activeItem.sentence || 'No sentence context was available.'}</blockquote>
             </div>
 
-            {item.status === 'failed' ? (
+            {activeItem.status === 'failed' ? (
               <div className="context-prepare-error">
-                <p className="message error-message" role="alert">{item.error}</p>
+                <p className="message error-message" role="alert">{activeItem.error}</p>
                 <button
                   className="subtle-button"
-                  disabled={retryingId === item.id}
-                  onClick={() => handleRetry(item)}
+                  disabled={retryingId === activeItem.id}
+                  onClick={() => handleRetry(activeItem)}
                   type="button"
                 >
-                  {retryingId === item.id ? 'Retrying…' : 'Retry'}
+                  {retryingId === activeItem.id ? 'Retrying…' : 'Retry'}
                 </button>
               </div>
             ) : (
               <>
-                {item.ambiguous && (
+                {activeItem.ambiguous && (
                   <p className="message notice-message context-ambiguity" role="status">
                     Meaning may be ambiguous. Review the alternatives before saving.
                   </p>
@@ -196,52 +226,52 @@ function PreparedVocabularyCards({ initialItems, onVocabularyCreated = () => {} 
 
                 <div className="context-fields">
                   <div className="form-field">
-                    <label htmlFor={`${item.id}-word`}>Word</label>
-                    <input id={`${item.id}-word`} onChange={(event) => handleFieldChange(item.id, 'word', event.target.value)} value={item.word} />
+                    <label htmlFor={`${activeItem.id}-word`}>Word</label>
+                    <input id={`${activeItem.id}-word`} onChange={(event) => handleFieldChange(activeItem.id, 'word', event.target.value)} value={activeItem.word} />
                   </div>
                   <div className="form-field">
-                    <label htmlFor={`${item.id}-phonetic`}>Phonetic</label>
-                    <input id={`${item.id}-phonetic`} onChange={(event) => handleFieldChange(item.id, 'phonetic', event.target.value)} value={item.phonetic || ''} />
+                    <label htmlFor={`${activeItem.id}-phonetic`}>Phonetic</label>
+                    <input id={`${activeItem.id}-phonetic`} onChange={(event) => handleFieldChange(activeItem.id, 'phonetic', event.target.value)} value={activeItem.phonetic || ''} />
                   </div>
                   <div className="form-field">
-                    <label htmlFor={`${item.id}-part-of-speech`}>Part of Speech</label>
-                    <input id={`${item.id}-part-of-speech`} onChange={(event) => handleFieldChange(item.id, 'part_of_speech', event.target.value)} value={item.part_of_speech || ''} />
+                    <label htmlFor={`${activeItem.id}-part-of-speech`}>Part of Speech</label>
+                    <input id={`${activeItem.id}-part-of-speech`} onChange={(event) => handleFieldChange(activeItem.id, 'part_of_speech', event.target.value)} value={activeItem.part_of_speech || ''} />
+                  </div>
+                  <div className="form-field context-field-half">
+                    <label htmlFor={`${activeItem.id}-meaning-vi`}>Vietnamese Meaning</label>
+                    <textarea id={`${activeItem.id}-meaning-vi`} onChange={(event) => handleFieldChange(activeItem.id, 'meaning_vi', event.target.value)} rows="2" value={activeItem.meaning_vi || ''} />
+                  </div>
+                  <div className="form-field context-field-half">
+                    <label htmlFor={`${activeItem.id}-meaning-en`}>English Meaning</label>
+                    <textarea id={`${activeItem.id}-meaning-en`} onChange={(event) => handleFieldChange(activeItem.id, 'meaning_en', event.target.value)} rows="3" value={activeItem.meaning_en || ''} />
                   </div>
                   <div className="form-field context-field-wide">
-                    <label htmlFor={`${item.id}-meaning-vi`}>Vietnamese Meaning</label>
-                    <textarea id={`${item.id}-meaning-vi`} onChange={(event) => handleFieldChange(item.id, 'meaning_vi', event.target.value)} rows="2" value={item.meaning_vi || ''} />
-                  </div>
-                  <div className="form-field context-field-wide">
-                    <label htmlFor={`${item.id}-meaning-en`}>English Meaning</label>
-                    <textarea id={`${item.id}-meaning-en`} onChange={(event) => handleFieldChange(item.id, 'meaning_en', event.target.value)} rows="3" value={item.meaning_en || ''} />
-                  </div>
-                  <div className="form-field context-field-wide">
-                    <label htmlFor={`${item.id}-example`}>Example</label>
-                    <textarea id={`${item.id}-example`} onChange={(event) => handleFieldChange(item.id, 'example', event.target.value)} rows="3" value={item.example || ''} />
-                    {item.example_source && <span className="context-field-source">Source: {item.example_source}</span>}
+                    <label htmlFor={`${activeItem.id}-example`}>Example</label>
+                    <textarea id={`${activeItem.id}-example`} onChange={(event) => handleFieldChange(activeItem.id, 'example', event.target.value)} rows="3" value={activeItem.example || ''} />
+                    {activeItem.example_source && <span className="context-field-source">Source: {activeItem.example_source}</span>}
                   </div>
                 </div>
 
-                {item.alternative_status === 'translating' && (
+                {activeItem.alternative_status === 'translating' && (
                   <p className="message" role="status">Refreshing the Vietnamese meaning for the selected definition…</p>
                 )}
-                {item.alternative_status === 'translation-unavailable' && (
+                {activeItem.alternative_status === 'translation-unavailable' && (
                   <p className="message notice-message" role="status">Vietnamese translation is unavailable. The selected English meaning was kept.</p>
                 )}
 
-                {item.alternatives?.length > 0 && (
-                  <details className="context-alternatives" open={item.ambiguous}>
-                    <summary>Other meanings ({item.alternatives.length})</summary>
+                {activeItem.alternatives?.length > 0 && (
+                  <details className="context-alternatives" open={activeItem.ambiguous}>
+                    <summary>Other meanings ({activeItem.alternatives.length})</summary>
                     <div className="context-alternative-list">
-                      {item.alternatives.map((alternative, alternativeIndex) => (
-                        <div className="context-alternative" key={`${item.id}-alternative-${alternativeIndex}`}>
+                      {activeItem.alternatives.map((alternative, alternativeIndex) => (
+                        <div className="context-alternative" key={`${activeItem.id}-alternative-${alternativeIndex}`}>
                           <div>
                             <strong>{alternative.part_of_speech || 'Meaning'}</strong>
                             <p>{alternative.meaning_en}</p>
                             {alternative.example && <small>Example: {alternative.example}</small>}
                             <small>Source: {alternative.source || 'dictionary'}</small>
                           </div>
-                          <button className="subtle-button" onClick={() => handleAlternative(item, alternative)} type="button">Use this meaning</button>
+                          <button className="subtle-button" onClick={() => handleAlternative(activeItem, alternative)} type="button">Use this meaning</button>
                         </div>
                       ))}
                     </div>
@@ -249,24 +279,24 @@ function PreparedVocabularyCards({ initialItems, onVocabularyCreated = () => {} 
                 )}
 
                 <div className="context-card-footer">
-                  <span>Dictionary source: {item.source || 'Unavailable'}</span>
+                  <span>Dictionary source: {activeItem.source || 'Unavailable'}</span>
                   <button
                     className="primary-button"
-                    disabled={item.existing || ['saving', 'saved', 'skipped'].includes(item.save_status)}
-                    onClick={() => handleSave(item)}
+                    disabled={activeItem.existing || ['saving', 'saved', 'skipped'].includes(activeItem.save_status)}
+                    onClick={() => handleSave(activeItem)}
                     type="button"
                   >
-                    {item.existing || item.save_status === 'skipped'
+                    {activeItem.existing || activeItem.save_status === 'skipped'
                       ? 'Already in vocabulary'
-                      : item.save_status === 'saving' ? 'Saving…' : item.save_status === 'saved' ? 'Saved' : 'Save Vocabulary'}
+                      : activeItem.save_status === 'saving' ? 'Saving…' : activeItem.save_status === 'saved' ? 'Saved' : 'Save Vocabulary'}
                   </button>
                 </div>
-                {item.save_status === 'failed' && <p className="message error-message" role="alert">Could not save: {item.save_error}</p>}
+                {activeItem.save_status === 'failed' && <p className="message error-message" role="alert">Could not save: {activeItem.save_error}</p>}
               </>
             )}
           </article>
-        ))}
-      </div>
+        </div>
+      )}
     </section>
   )
 }

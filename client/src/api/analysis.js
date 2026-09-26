@@ -34,6 +34,28 @@ export async function analyzeCefrText(text) {
   }
 }
 
+export async function getVocabularyRecommendations(text, learnerPreferences, useAi = false) {
+  try {
+    const response = await fetch('/api/analysis/recommendations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text,
+        learner_preferences: learnerPreferences,
+        use_ai: useAi,
+      }),
+    })
+
+    return readJson(response)
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error('Unable to reach the server. Check that the backend is running.')
+    }
+
+    throw error
+  }
+}
+
 export async function prepareVocabularyFromContext(items) {
   try {
     const response = await fetch('/api/analysis/prepare-vocabulary', {

@@ -63,6 +63,19 @@ function countWords(text) {
   return trimmedText ? trimmedText.split(/\s+/).length : 0
 }
 
+function CompletedStep({ summary, title, onEdit }) {
+  return (
+    <div className="import-step-summary">
+      <span className="import-step-complete" aria-hidden="true">✓</span>
+      <div>
+        <h3>{title}</h3>
+        <p>{summary}</p>
+      </div>
+      <button className="subtle-button" onClick={onEdit} type="button">Edit</button>
+    </div>
+  )
+}
+
 function ImportPage({ onVocabularyCreated }) {
   const [mode, setMode] = useState('text')
   const [pastedText, setPastedText] = useState('')
@@ -82,6 +95,9 @@ function ImportPage({ onVocabularyCreated }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [cefrAnalysis, setCefrAnalysis] = useState(null)
   const [analysisError, setAnalysisError] = useState('')
+  const [inputExpanded, setInputExpanded] = useState(true)
+  const [previewExpanded, setPreviewExpanded] = useState(true)
+  const [continueExpanded, setContinueExpanded] = useState(true)
   const fileInputRef = useRef(null)
   const activeEnrichmentIds = useRef(new Set())
 
@@ -105,6 +121,9 @@ function ImportPage({ onVocabularyCreated }) {
     setOcrConfidence(null)
     setOcrSource('')
     setShowPreview(false)
+    setInputExpanded(true)
+    setPreviewExpanded(true)
+    setContinueExpanded(true)
     resetCefrAnalysis()
   }
 
@@ -123,6 +142,9 @@ function ImportPage({ onVocabularyCreated }) {
     setOcrConfidence(null)
     setOcrSource('')
     setShowPreview(true)
+    setInputExpanded(false)
+    setPreviewExpanded(true)
+    setContinueExpanded(true)
     resetCefrAnalysis()
   }
 
@@ -177,7 +199,10 @@ function ImportPage({ onVocabularyCreated }) {
       )
       setOcrConfidence(Number.isFinite(result.confidence) ? result.confidence : null)
       setOcrSource(result.source || '')
-      setShowPreview(true)
+    setShowPreview(true)
+    setInputExpanded(false)
+    setPreviewExpanded(true)
+    setContinueExpanded(true)
     } catch (error) {
       setValidationError(error.message)
     } finally {
@@ -187,6 +212,8 @@ function ImportPage({ onVocabularyCreated }) {
 
   function handleReviewedTextChange(event) {
     setReviewedText(event.target.value)
+    setPreviewExpanded(true)
+    setContinueExpanded(true)
     resetCefrAnalysis()
   }
 
@@ -344,6 +371,9 @@ function ImportPage({ onVocabularyCreated }) {
       setAnalysisError('')
       setCefrAnalysis(null)
       setIsReady(true)
+      setInputExpanded(false)
+      setPreviewExpanded(false)
+      setContinueExpanded(false)
       return
     }
 
@@ -356,6 +386,9 @@ function ImportPage({ onVocabularyCreated }) {
       const result = await analyzeCefrText(reviewedText)
       setCefrAnalysis(result)
       setIsReady(true)
+      setInputExpanded(false)
+      setPreviewExpanded(false)
+      setContinueExpanded(false)
     } catch (error) {
       setAnalysisError(error.message)
     } finally {
@@ -374,35 +407,44 @@ function ImportPage({ onVocabularyCreated }) {
 
   return (
     <section className="smart-import-page">
-      <div className="import-mode-switch" aria-label="Import source">
-        <button
-          aria-pressed={mode === 'text'}
-          className={`add-mode-button${mode === 'text' ? ' active' : ''}`}
-          onClick={() => setMode('text')}
-          type="button"
-        >
-          Paste Text
-        </button>
-        <button
-          aria-pressed={mode === 'image'}
-          className={`add-mode-button${mode === 'image' ? ' active' : ''}`}
-          onClick={() => setMode('image')}
-          type="button"
-        >
-          Upload Image
-        </button>
-      </div>
-
-      <section className="import-step" aria-labelledby="import-input-title">
-        <div className="import-step-heading">
-          <span className="import-step-number" aria-hidden="true">1</span>
-          <div>
-            <h3 id="import-input-title">Input</h3>
-            <p>{mode === 'text' ? 'Paste the English text you want to review.' : 'Choose an image containing English or bilingual vocabulary text.'}</p>
+      <section className="import-step" aria-label="Input">
+        {showPreview && !inputExpanded ? (
+          <CompletedStep
+            onEdit={() => setInputExpanded(true)}
+            summary={mode === 'text'
+              ? `Paste Text · ${pastedText.length.toLocaleString()} characters`
+              : `Upload Image · ${selectedImage?.name || 'Image selected'}`}
+            title="Input"
+          />
+        ) : <>
+          <div className="import-step-heading">
+            <span className="import-step-number" aria-hidden="true">1</span>
+            <div>
+              <h3 id="import-input-title">Input</h3>
+              <p>{mode === 'text' ? 'Paste the English text you want to review.' : 'Choose an image containing English or bilingual vocabulary text.'}</p>
+            </div>
           </div>
-        </div>
 
-        {mode === 'text' ? (
+          <div className="import-mode-switch" aria-label="Import source">
+            <button
+              aria-pressed={mode === 'text'}
+              className={`add-mode-button${mode === 'text' ? ' active' : ''}`}
+              onClick={() => setMode('text')}
+              type="button"
+            >
+              Paste Text
+            </button>
+            <button
+              aria-pressed={mode === 'image'}
+              className={`add-mode-button${mode === 'image' ? ' active' : ''}`}
+              onClick={() => setMode('image')}
+              type="button"
+            >
+              Upload Image
+            </button>
+          </div>
+
+          {mode === 'text' ? (
           <div className="import-input-content">
             <label htmlFor="import-pasted-text">English text</label>
             <textarea
@@ -453,11 +495,19 @@ function ImportPage({ onVocabularyCreated }) {
             </button>
             {isExtracting && <p className="message import-progress" role="status">Extracting and arranging text. This may take a moment…</p>}
           </div>
-        )}
+          )}
+        </>}
       </section>
 
       {showPreview && (
-        <section className="import-step" aria-labelledby="import-preview-title">
+        <section className="import-step" aria-label="Preview and edit">
+          {isReady && !previewExpanded ? (
+            <CompletedStep
+              onEdit={() => setPreviewExpanded(true)}
+              summary={previewMode === 'table' ? `${structuredRows.length} vocabulary rows reviewed` : 'Text reviewed'}
+              title="Preview and edit"
+            />
+          ) : <>
           <div className="import-step-heading">
             <span className="import-step-number" aria-hidden="true">2</span>
             <div>
@@ -636,11 +686,19 @@ function ImportPage({ onVocabularyCreated }) {
                 : 'Structured vocabulary rows keep their existing review and Smart Fill workflow; CEFR text analysis is not applied to table mode.'}
             </p>
           </div>
+          </>}
         </section>
       )}
 
       {showPreview && (
-        <section className="import-step" aria-labelledby="import-continue-title">
+        <section className="import-step" aria-label="Continue">
+          {isReady && !continueExpanded ? (
+            <CompletedStep
+              onEdit={() => setContinueExpanded(true)}
+              summary={previewMode === 'table' ? 'Table review complete' : 'Ready for analysis'}
+              title="Continue"
+            />
+          ) : <>
           <div className="import-step-heading">
             <span className="import-step-number" aria-hidden="true">3</span>
             <div>
@@ -659,6 +717,7 @@ function ImportPage({ onVocabularyCreated }) {
           {isReady && previewMode === 'table' && (
             <p className="message success-message import-ready" role="status">Structured rows are ready for the existing import workflow.</p>
           )}
+          </>}
         </section>
       )}
 

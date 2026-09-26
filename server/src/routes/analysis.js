@@ -4,11 +4,17 @@ import { isValidEnglishVocabulary, normalizeLookupVocabulary } from './dictionar
 import { analyzeCefrText, normalizeExistingVocabulary } from '../services/cefrAnalysis.js'
 import { prepareContextVocabularyItem } from '../services/contextVocabulary.js'
 import { translateEnglishToVietnamese } from '../services/translation.js'
+import { rankVocabularyCandidates } from '../services/aiRanking.js'
+import {
+  applyAiRecommendations,
+  generateVocabularyCandidates,
+} from '../services/vocabularyRecommendations.js'
 
 const router = Router()
 const maximumTextLength = 100_000
 const maximumPrepareItems = 30
 const allowedCefrLevels = new Set(['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'Unknown'])
+const allowedRecommendationTargets = new Set(['A2', 'B1', 'B2', 'C1'])
 
 function loadExistingVocabulary() {
   return new Promise((resolve, reject) => {
@@ -37,6 +43,69 @@ router.post('/cefr', async (request, response, next) => {
   try {
     const existingVocabulary = await loadExistingVocabulary()
     return response.json(analyzeCefrText(text, existingVocabulary))
+  } catch (error) {
+    return next(error)
+  }
+})
+
+function normalizeLearnerPreferences(value = {}) {
+  return {
+    goal: value.goal === 'ielts' ? 'ielts' : 'general',
+    target_level: allowedRecommendationTargets.has(value.target_level) ? value.target_level : 'B2',
+  }
+}
+
+router.post('/recommendations', async (request, response, next) => {
+  const text = request.body?.text
+
+  if (typeof text !== 'string' || !text.trim()) {
+    return response.status(400).json({ error: 'text is required and cannot be empty.' })
+  }
+
+  if (text.length > maximumTextLength) {
+    return response.status(413).json({ error: 'Text is too long. Use up to 100,000 characters.' })
+  }
+
+  const learnerPreferences = normalizeLearnerPreferences(request.body?.learner_preferences)
+  const useAi = request.body?.use_ai === true
+
+  try {
+    const existingVocabulary = await loadExistingVocabulary()
+    const analysis = analyzeCefrText(text, existingVocabulary)
+    const deterministicCandidates = generateVocabularyCandidates({
+      text,
+      analysis,
+      existingVocabulary,
+      learnerPreferences,
+    })
+
+    let recommendations = deterministicCandidates
+    let ai = { status: useAi ? 'unavailable' : 'disabled', provider: null }
+
+    if (useAi && deterministicCandidates.length > 0) {
+      const ranking = await rankVocabularyCandidates({
+        text,
+        candidates: deterministicCandidates,
+        learnerPreferences,
+      })
+
+      ai = {
+        status: ranking.status,
+        provider: ranking.provider,
+        reason: ranking.reason,
+      }
+
+      if (ranking.status === 'used') {
+        recommendations = applyAiRecommendations(deterministicCandidates, ranking.recommendations)
+      }
+    }
+
+    return response.json({
+      recommendations,
+      candidate_count: recommendations.length,
+      learner_preferences: learnerPreferences,
+      ai,
+    })
   } catch (error) {
     return next(error)
   }

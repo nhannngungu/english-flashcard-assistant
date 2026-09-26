@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { prepareVocabularyFromContext } from '../api/analysis.js'
 import { extractContainingSentence, extractSurroundingContext } from '../utils/textContext.js'
 import PreparedVocabularyCards from './PreparedVocabularyCards.jsx'
+import VocabularyRecommendations from './VocabularyRecommendations.jsx'
 
 const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'Unknown']
 const advancedLevelGroups = {
@@ -39,6 +40,10 @@ function CefrAnalysisPanel({ analysis, onVocabularyCreated, text }) {
   const [preferredOccurrences, setPreferredOccurrences] = useState({})
   const [selectedWords, setSelectedWords] = useState(() => new Set())
   const [preparedItems, setPreparedItems] = useState(null)
+  const [preparedVersion, setPreparedVersion] = useState(0)
+  const [recommendationPreparedItems, setRecommendationPreparedItems] = useState(null)
+  const [recommendationPreparedVersion, setRecommendationPreparedVersion] = useState(0)
+  const [activePreparedSource, setActivePreparedSource] = useState('manual')
   const [isPreparing, setIsPreparing] = useState(false)
   const [prepareError, setPrepareError] = useState('')
   const uniqueWords = useMemo(() => buildUniqueWords(analysis.tokens), [analysis.tokens])
@@ -74,6 +79,7 @@ function CefrAnalysisPanel({ analysis, onVocabularyCreated, text }) {
   function clearPreparation() {
     setPreparedItems(null)
     setPrepareError('')
+    if (recommendationPreparedItems?.length) setActivePreparedSource('recommendations')
   }
 
   function updateSelection(nextSelection) {
@@ -134,10 +140,22 @@ function CefrAnalysisPanel({ analysis, onVocabularyCreated, text }) {
     try {
       const result = await prepareVocabularyFromContext(items)
       setPreparedItems(result.items || [])
+      setPreparedVersion((version) => version + 1)
+      setActivePreparedSource('manual')
     } catch (error) {
       setPrepareError(error.message)
     } finally {
       setIsPreparing(false)
+    }
+  }
+
+  function handleRecommendationPrepared(items) {
+    setRecommendationPreparedItems(items)
+    if (items?.length) {
+      setRecommendationPreparedVersion((version) => version + 1)
+      setActivePreparedSource('recommendations')
+    } else if (preparedItems?.length) {
+      setActivePreparedSource('manual')
     }
   }
 
@@ -200,11 +218,12 @@ function CefrAnalysisPanel({ analysis, onVocabularyCreated, text }) {
         ))}
       </div>
 
-      <p className="cefr-filter-help">Filter counts show occurrences. Turning a filter off keeps the original text visible and removes only that level’s highlighting.</p>
-      <div className="cefr-text" aria-label="Analyzed text">{renderHighlightedText()}</div>
+      <div className="cefr-analysis-row">
+        <div className="cefr-main-column">
+          <p className="cefr-filter-help">Toggle a level to show or hide its highlighting.</p>
+          <div className="cefr-text" aria-label="Analyzed text">{renderHighlightedText()}</div>
 
-      <div className="cefr-workspace">
-        <section className="cefr-detail" aria-labelledby="cefr-detail-title">
+          <section className="cefr-detail" aria-labelledby="cefr-detail-title">
           <h4 id="cefr-detail-title">Word details</h4>
           {focused && focusedToken ? (
             <>
@@ -228,13 +247,16 @@ function CefrAnalysisPanel({ analysis, onVocabularyCreated, text }) {
           ) : (
             <p>Choose a highlighted word to inspect its sentence, normalized form, level, and vocabulary status.</p>
           )}
-        </section>
+          </section>
 
-        <section className="cefr-selection" aria-labelledby="cefr-selection-title">
+        </div>
+
+        <aside className="cefr-side-column">
+          <section className="cefr-selection" aria-labelledby="cefr-selection-title">
           <div className="cefr-selection-heading">
             <div>
               <h4 id="cefr-selection-title">Selected words</h4>
-              <p>{selected.length} unique {selected.length === 1 ? 'word' : 'words'}</p>
+              <p>{selected.length} selected</p>
             </div>
             <div className="cefr-selection-actions">
               <button className="subtle-button" onClick={() => selectLevelGroup('B2+')} type="button">Select all B2+</button>
@@ -248,8 +270,7 @@ function CefrAnalysisPanel({ analysis, onVocabularyCreated, text }) {
               {selected.map((word) => (
                 <div className="cefr-selected-row" key={word.normalized}>
                   <span>
-                    <strong>{word.selectedToken.text}</strong> · {word.level} · Not in vocabulary
-                    <small>{word.sentence}</small>
+                    <strong>{word.selectedToken.text}</strong> · {word.level}
                   </span>
                   <button className="subtle-button" onClick={() => removeSelectedWord(word.normalized)} type="button">Remove</button>
                 </div>
@@ -263,13 +284,53 @@ function CefrAnalysisPanel({ analysis, onVocabularyCreated, text }) {
             {isPreparing ? 'Preparing with Context…' : 'Prepare Selected Words'}
           </button>
           {prepareError && <p className="message error-message" role="alert">{prepareError}</p>}
-        </section>
+          </section>
+
+        </aside>
       </div>
 
-      {preparedItems && preparedItems.length > 0 && (
-        <div className="cefr-prepared-import">
-          <PreparedVocabularyCards initialItems={preparedItems} onVocabularyCreated={onVocabularyCreated} />
-        </div>
+      <VocabularyRecommendations
+        onPreparedItems={handleRecommendationPrepared}
+        onVocabularyCreated={onVocabularyCreated}
+        showPrepared={false}
+        text={text}
+      />
+
+      {(preparedItems?.length || recommendationPreparedItems?.length) && (
+        <section className="cefr-prepared-import" aria-label="Prepared vocabulary">
+          {preparedItems?.length && recommendationPreparedItems?.length && (
+            <div className="prepared-source-tabs" role="tablist" aria-label="Prepared vocabulary source">
+              <button
+                aria-selected={activePreparedSource === 'manual'}
+                className={activePreparedSource === 'manual' ? 'active' : ''}
+                onClick={() => setActivePreparedSource('manual')}
+                role="tab"
+                type="button"
+              >
+                Selected words
+              </button>
+              <button
+                aria-selected={activePreparedSource === 'recommendations'}
+                className={activePreparedSource === 'recommendations' ? 'active' : ''}
+                onClick={() => setActivePreparedSource('recommendations')}
+                role="tab"
+                type="button"
+              >
+                Recommendations
+              </button>
+            </div>
+          )}
+          {preparedItems?.length && (
+            <div hidden={activePreparedSource !== 'manual'}>
+              <PreparedVocabularyCards key={`manual-${preparedVersion}`} initialItems={preparedItems} onVocabularyCreated={onVocabularyCreated} />
+            </div>
+          )}
+          {recommendationPreparedItems?.length && (
+            <div hidden={activePreparedSource !== 'recommendations'}>
+              <PreparedVocabularyCards key={`recommendations-${recommendationPreparedVersion}`} initialItems={recommendationPreparedItems} onVocabularyCreated={onVocabularyCreated} />
+            </div>
+          )}
+        </section>
       )}
     </section>
   )
