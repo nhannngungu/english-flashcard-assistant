@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createVocabulary, lookupDictionary, lookupImages } from '../api/vocabularies.js'
+import { createVocabularySet, getAllVocabularySets } from '../api/vocabularySets.js'
 import BulkImportSection from '../components/BulkImportSection.jsx'
 import ImageSuggestions from '../components/ImageSuggestions.jsx'
 import VocabularyFormFields from '../components/VocabularyFormFields.jsx'
+import VocabularySetFields from '../components/VocabularySetFields.jsx'
 
 const initialForm = {
   word: '',
@@ -33,6 +35,26 @@ function AddWordsPage({ onVocabularyCreated }) {
   const [hasSearchedImages, setHasSearchedImages] = useState(false)
   const [imageLookupError, setImageLookupError] = useState('')
   const [imageSearchPage, setImageSearchPage] = useState(1)
+  const [setChoice, setSetChoice] = useState('none')
+  const [existingSetId, setExistingSetId] = useState('')
+  const [availableSets, setAvailableSets] = useState([])
+  const [setTitle, setSetTitle] = useState('')
+  const [setCoverImageUrl, setSetCoverImageUrl] = useState('')
+  const [setLoadError, setSetLoadError] = useState('')
+
+  useEffect(() => {
+    let active = true
+
+    getAllVocabularySets()
+      .then((sets) => {
+        if (active) setAvailableSets(sets)
+      })
+      .catch((requestError) => {
+        if (active) setSetLoadError(requestError.message)
+      })
+
+    return () => { active = false }
+  }, [])
 
   function handleChange(event) {
     const { name, value } = event.target
@@ -127,7 +149,23 @@ function AddWordsPage({ onVocabularyCreated }) {
     setError('')
 
     try {
-      const vocabulary = await createVocabulary(form)
+      let setId = null
+      let createdSet = null
+
+      if (setChoice === 'existing') {
+        if (!existingSetId) throw new Error('Choose an existing vocabulary set.')
+        setId = Number(existingSetId)
+      } else if (setChoice === 'new') {
+        const vocabularySet = await createVocabularySet({
+          title: setTitle,
+          cover_image_url: setCoverImageUrl,
+        })
+        createdSet = vocabularySet
+        setId = vocabularySet.id
+        setAvailableSets((sets) => [{ ...vocabularySet, word_count: 0 }, ...sets])
+      }
+
+      const vocabulary = await createVocabulary({ ...form, set_id: setId })
       setForm(initialForm)
       setDictionarySource('')
       setTranslationSource('')
@@ -138,6 +176,12 @@ function AddWordsPage({ onVocabularyCreated }) {
       setHasSearchedImages(false)
       setImageLookupError('')
       setImageSearchPage(1)
+      setSetTitle('')
+      setSetCoverImageUrl('')
+      if (createdSet) {
+        setSetChoice('existing')
+        setExistingSetId(String(createdSet.id))
+      }
       setMessage(`“${vocabulary.word}” was added successfully.`)
       onVocabularyCreated()
     } catch (requestError) {
@@ -230,6 +274,45 @@ function AddWordsPage({ onVocabularyCreated }) {
               {imageLookupError && <p className="message error-message" role="alert">{imageLookupError}</p>}
             </section>
           )}
+
+          <section className="manual-set-assignment" aria-labelledby="manual-set-title">
+            <div>
+              <h3 id="manual-set-title">Vocabulary set</h3>
+              <p>Add this word without a set, attach it to an existing set, or start a new set.</p>
+            </div>
+            <div className="set-choice-row" role="radiogroup" aria-label="Vocabulary set choice">
+              {[
+                ['none', 'No set'],
+                ['existing', 'Existing set'],
+                ['new', 'New set'],
+              ].map(([value, label]) => (
+                <label key={value}>
+                  <input checked={setChoice === value} name="set-choice" onChange={() => setSetChoice(value)} type="radio" />
+                  {label}
+                </label>
+              ))}
+            </div>
+            {setChoice === 'existing' && (
+              <div className="form-field">
+                <label htmlFor="manual-existing-set">Choose set</label>
+                <select id="manual-existing-set" onChange={(event) => setExistingSetId(event.target.value)} value={existingSetId}>
+                  <option value="">Select a vocabulary set</option>
+                  {availableSets.map((set) => <option key={set.id} value={set.id}>{set.title} ({set.word_count})</option>)}
+                </select>
+                {setLoadError && <small className="error-text">Could not load sets: {setLoadError}</small>}
+              </div>
+            )}
+            {setChoice === 'new' && (
+              <VocabularySetFields
+                candidateImages={[form.image_url]}
+                coverImageUrl={setCoverImageUrl}
+                idPrefix="manual-new-set"
+                onCoverImageUrlChange={setSetCoverImageUrl}
+                onTitleChange={setSetTitle}
+                title={setTitle}
+              />
+            )}
+          </section>
 
           <button className="primary-button" disabled={isSubmitting} type="submit">
             {isSubmitting ? 'Adding…' : 'Add Word'}

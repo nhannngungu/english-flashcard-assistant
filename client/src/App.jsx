@@ -17,9 +17,15 @@ const pageTitles = {
 function App() {
   const [activePage, setActivePage] = useState('dashboard')
   const [vocabularyRefreshKey, setVocabularyRefreshKey] = useState(0)
+  const [reviewInitialMode, setReviewInitialMode] = useState('smart')
 
   function handleVocabularyCreated() {
     setVocabularyRefreshKey((currentKey) => currentKey + 1)
+  }
+
+  function handleNavigate(page, reviewMode = 'smart') {
+    if (page === 'review') setReviewInitialMode(reviewMode)
+    setActivePage(page)
   }
 
   let pageContent
@@ -31,16 +37,16 @@ function App() {
   } else if (activePage === 'import') {
     pageContent = <ImportPage onVocabularyCreated={handleVocabularyCreated} />
   } else if (activePage === 'review') {
-    pageContent = <ReviewPage />
+    pageContent = <ReviewPage initialMode={reviewInitialMode} />
   } else {
-    pageContent = <DashboardPage onNavigate={setActivePage} />
+    pageContent = <DashboardPage onNavigate={handleNavigate} />
   }
 
   return (
     <div className="app-shell">
       <header className="app-header">
         <h1>English Flashcard Assistant</h1>
-        <Navigation activePage={activePage} onNavigate={setActivePage} />
+        <Navigation activePage={activePage} onNavigate={handleNavigate} />
       </header>
       <main className="page-content">
         <h2>{pageTitles[activePage]}</h2>

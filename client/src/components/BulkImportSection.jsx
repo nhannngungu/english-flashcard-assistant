@@ -6,6 +6,8 @@ import {
   lookupImages,
 } from '../api/vocabularies.js'
 import ImageSuggestions from './ImageSuggestions.jsx'
+import VocabularySetFields from './VocabularySetFields.jsx'
+import { createVocabularySet } from '../api/vocabularySets.js'
 import { parseBulkWords, runWithConcurrency } from '../utils/bulkImport.js'
 
 const editableFields = [
@@ -82,6 +84,8 @@ function BulkImportSection({ initialWords = [], onVocabularyCreated = () => {} }
   const [isSaving, setIsSaving] = useState(false)
   const [summary, setSummary] = useState('')
   const [batchError, setBatchError] = useState('')
+  const [setTitle, setSetTitle] = useState('')
+  const [setCoverImageUrl, setSetCoverImageUrl] = useState('')
 
   function updateItem(id, updates) {
     setItems((currentItems) =>
@@ -266,6 +270,21 @@ function BulkImportSection({ initialWords = [], onVocabularyCreated = () => {} }
       failed: items.filter((item) => item.lookupStatus === 'failed').length,
     }
 
+    const newItems = selectedItems.filter(
+      (item) => !existingWords.has(item.word.trim().toLocaleLowerCase('en-US')),
+    )
+    let vocabularySet
+
+    if (newItems.length > 0) {
+      try {
+        vocabularySet = await createVocabularySet({ title: setTitle, cover_image_url: setCoverImageUrl })
+      } catch (error) {
+        setBatchError(`Could not create the vocabulary set: ${error.message}`)
+        setIsSaving(false)
+        return
+      }
+    }
+
     for (const item of selectedItems) {
       const normalizedWord = item.word.trim().toLocaleLowerCase('en-US')
 
@@ -287,6 +306,7 @@ function BulkImportSection({ initialWords = [], onVocabularyCreated = () => {} }
           example: item.example,
           audio_url: item.audio_url,
           image_url: item.image_url,
+          set_id: vocabularySet?.id || null,
           status: 'new',
         })
         existingWords.add(normalizedWord)
@@ -484,9 +504,20 @@ function BulkImportSection({ initialWords = [], onVocabularyCreated = () => {} }
           </div>
 
           {successfulItems.length > 0 && (
-            <button className="primary-button" disabled={isLookingUp || isSaving || selectedCount === 0} onClick={handleSaveSelected} type="button">
-              {isSaving ? 'Saving…' : `Save Selected (${selectedCount})`}
-            </button>
+            <div className="bulk-set-save">
+              <VocabularySetFields
+                candidateImages={successfulItems.filter((item) => item.selected).map((item) => item.image_url)}
+                coverImageUrl={setCoverImageUrl}
+                disabled={isSaving}
+                idPrefix="bulk-import-set"
+                onCoverImageUrlChange={setSetCoverImageUrl}
+                onTitleChange={setSetTitle}
+                title={setTitle}
+              />
+              <button className="primary-button" disabled={isLookingUp || isSaving || selectedCount === 0} onClick={handleSaveSelected} type="button">
+                {isSaving ? 'Saving Set…' : `Save Selected as Set (${selectedCount})`}
+              </button>
+            </div>
           )}
         </div>
       )}

@@ -5,7 +5,9 @@ import analysisRoutes from './routes/analysis.js'
 import dictionaryRoutes from './routes/dictionary.js'
 import imageRoutes from './routes/images.js'
 import importRoutes from './routes/imports.js'
+import statisticsRoutes from './routes/statistics.js'
 import vocabularyRoutes from './routes/vocabularies.js'
+import vocabularySetRoutes from './routes/vocabularySets.js'
 
 try {
   process.loadEnvFile(fileURLToPath(new URL('../.env', import.meta.url)))
@@ -31,10 +33,12 @@ app.get('/api/health', (request, response) => {
 })
 
 app.use('/api/vocabularies', vocabularyRoutes)
+app.use('/api/vocabulary-sets', vocabularySetRoutes)
 app.use('/api/analysis', analysisRoutes)
 app.use('/api/dictionary', dictionaryRoutes)
 app.use('/api/images', imageRoutes)
 app.use('/api/import', importRoutes)
+app.use('/api/statistics', statisticsRoutes)
 
 app.use((error, request, response, next) => {
   if (error instanceof SyntaxError && 'body' in error) {

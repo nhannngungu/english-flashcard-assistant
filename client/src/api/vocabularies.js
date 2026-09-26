@@ -39,6 +39,18 @@ export function getVocabularies() {
   return request(vocabularyApiUrl)
 }
 
+export function getSmartReviewCards() {
+  return request(`${vocabularyApiUrl}/review/smart`)
+}
+
+export function rateVocabularyReview(id, rating) {
+  return request(`${vocabularyApiUrl}/${id}/review`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rating }),
+  })
+}
+
 export function createVocabulary(vocabulary) {
   return request(vocabularyApiUrl, {
     method: 'POST',

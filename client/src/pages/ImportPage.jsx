@@ -3,6 +3,7 @@ import { analyzeCefrText } from '../api/analysis.js'
 import { extractTextFromImage } from '../api/imports.js'
 import { lookupDictionary, normalizeVocabularyLookup } from '../api/vocabularies.js'
 import CefrAnalysisPanel from '../components/CefrAnalysisPanel.jsx'
+import VocabularySetSavePanel from '../components/VocabularySetSavePanel.jsx'
 import { runWithConcurrency } from '../utils/bulkImport.js'
 
 const maximumImageSize = 8 * 1024 * 1024
@@ -726,6 +727,16 @@ function ImportPage({ onVocabularyCreated }) {
           analysis={cefrAnalysis}
           onVocabularyCreated={onVocabularyCreated}
           text={reviewedText}
+        />
+      )}
+
+      {isReady && previewMode === 'table' && (
+        <VocabularySetSavePanel
+          allowSelection
+          heading="Save reviewed OCR rows as one set"
+          idPrefix="ocr-vocabulary-set"
+          items={structuredRows}
+          onVocabularyCreated={onVocabularyCreated}
         />
       )}
     </section>

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { prepareVocabularyFromContext, translatePreparedDefinition } from '../api/analysis.js'
 import { createVocabulary, getVocabularies } from '../api/vocabularies.js'
+import VocabularySetSavePanel from './VocabularySetSavePanel.jsx'
 
 function editableItem(item, index) {
   return {
@@ -297,6 +298,13 @@ function PreparedVocabularyCards({ initialItems, onVocabularyCreated = () => {} 
           </article>
         </div>
       )}
+
+      <VocabularySetSavePanel
+        heading="Save all prepared words as one set"
+        idPrefix={`prepared-vocabulary-set-${initialItems.length}`}
+        items={items}
+        onVocabularyCreated={onVocabularyCreated}
+      />
     </section>
   )
 }

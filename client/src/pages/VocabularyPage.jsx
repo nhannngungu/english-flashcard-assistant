@@ -17,6 +17,23 @@ function createEditForm(vocabulary) {
   }
 }
 
+const pageSizeOptions = [10, 20, 50]
+
+function pageItems(totalPages, currentPage) {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1)
+
+  const items = [1]
+  const start = Math.max(2, currentPage - 1)
+  const end = Math.min(totalPages - 1, currentPage + 1)
+
+  if (start > 2) items.push('start-ellipsis')
+  for (let page = start; page <= end; page += 1) items.push(page)
+  if (end < totalPages - 1) items.push('end-ellipsis')
+  items.push(totalPages)
+
+  return items
+}
+
 function VocabularyPage({ refreshKey }) {
   const [vocabularies, setVocabularies] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -27,6 +44,8 @@ function VocabularyPage({ refreshKey }) {
   const [editForm, setEditForm] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   async function loadVocabularies() {
     setIsLoading(true)
@@ -46,6 +65,15 @@ function VocabularyPage({ refreshKey }) {
     loadVocabularies()
   }, [refreshKey])
 
+  const totalPages = Math.max(1, Math.ceil(vocabularies.length / pageSize))
+  const visiblePage = Math.min(currentPage, totalPages)
+  const firstItemIndex = (visiblePage - 1) * pageSize
+  const visibleVocabularies = vocabularies.slice(firstItemIndex, firstItemIndex + pageSize)
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages))
+  }, [totalPages])
+
   function startEditing(vocabulary) {
     setMessage('')
     setActionError('')
@@ -56,6 +84,11 @@ function VocabularyPage({ refreshKey }) {
   function handleEditChange(event) {
     const { name, value } = event.target
     setEditForm((currentForm) => ({ ...currentForm, [name]: value }))
+  }
+
+  function handlePageSizeChange(event) {
+    setPageSize(Number(event.target.value))
+    setCurrentPage(1)
   }
 
   async function saveEdit(event) {
@@ -135,47 +168,77 @@ function VocabularyPage({ refreshKey }) {
       {vocabularies.length === 0 ? (
         <p className="message">No vocabulary items yet. Add your first word from the Add Words page.</p>
       ) : (
-        <div className="table-wrapper">
-          <table>
-            <caption className="sr-only">All vocabulary items</caption>
-            <thead>
-              <tr>
-                <th scope="col">Word</th>
-                <th scope="col">Vietnamese Meaning</th>
-                <th scope="col">Part of Speech</th>
-                <th scope="col">Status</th>
-                <th scope="col">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vocabularies.map((vocabulary) => (
-                <tr key={vocabulary.id}>
-                  <td>{vocabulary.word}</td>
-                  <td>{getVietnameseMeaning(vocabulary) || '—'}</td>
-                  <td>{vocabulary.part_of_speech || '—'}</td>
-                  <td>
-                    <span className={`status status-${vocabulary.status}`}>{vocabulary.status}</span>
-                  </td>
-                  <td>
-                    <div className="table-actions">
-                      <button className="secondary-button" onClick={() => startEditing(vocabulary)} type="button">
-                        Edit
-                      </button>
-                      <button
-                        className="delete-button"
-                        disabled={deletingId === vocabulary.id}
-                        onClick={() => handleDelete(vocabulary)}
-                        type="button"
-                      >
-                        {deletingId === vocabulary.id ? 'Deleting…' : 'Delete'}
-                      </button>
-                    </div>
-                  </td>
+        <section className="vocabulary-list" aria-label="Vocabulary list">
+          <div className="vocabulary-list-toolbar">
+            <p>Showing {firstItemIndex + 1}–{Math.min(firstItemIndex + pageSize, vocabularies.length)} of {vocabularies.length} vocabulary {vocabularies.length === 1 ? 'item' : 'items'}</p>
+            <label>
+              Rows per page
+              <select onChange={handlePageSizeChange} value={pageSize}>
+                {pageSizeOptions.map((size) => <option key={size} value={size}>{size}</option>)}
+              </select>
+            </label>
+          </div>
+
+          <div className="table-wrapper">
+            <table>
+              <caption className="sr-only">Vocabulary items on the current page</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Word</th>
+                  <th scope="col">Vietnamese Meaning</th>
+                  <th scope="col">Part of Speech</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {visibleVocabularies.map((vocabulary) => (
+                  <tr key={vocabulary.id}>
+                    <td>{vocabulary.word}</td>
+                    <td>{getVietnameseMeaning(vocabulary) || '—'}</td>
+                    <td>{vocabulary.part_of_speech || '—'}</td>
+                    <td>
+                      <span className={`status status-${vocabulary.status}`}>{vocabulary.status}</span>
+                    </td>
+                    <td>
+                      <div className="table-actions">
+                        <button className="secondary-button" onClick={() => startEditing(vocabulary)} type="button">
+                          Edit
+                        </button>
+                        <button
+                          className="delete-button"
+                          disabled={deletingId === vocabulary.id}
+                          onClick={() => handleDelete(vocabulary)}
+                          type="button"
+                        >
+                          {deletingId === vocabulary.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {totalPages > 1 && (
+            <nav className="vocabulary-pagination" aria-label="Vocabulary pages">
+              <button className="subtle-button" disabled={visiblePage === 1} onClick={() => setCurrentPage((page) => page - 1)} type="button">Previous</button>
+              {pageItems(totalPages, visiblePage).map((item) => typeof item === 'number' ? (
+                <button
+                  aria-current={item === visiblePage ? 'page' : undefined}
+                  className={item === visiblePage ? 'active' : ''}
+                  key={item}
+                  onClick={() => setCurrentPage(item)}
+                  type="button"
+                >
+                  {item}
+                </button>
+              ) : <span aria-hidden="true" className="vocabulary-pagination-ellipsis" key={item}>…</span>)}
+              <button className="subtle-button" disabled={visiblePage === totalPages} onClick={() => setCurrentPage((page) => page + 1)} type="button">Next</button>
+            </nav>
+          )}
+        </section>
       )}
     </>
   )
