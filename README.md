@@ -110,6 +110,12 @@ OCR_SPACE_API_KEY=your_ocr_space_api_key_here
 
 Optional AI ranking settings are also documented in `server/.env.example`. Do not put real values in this README or any tracked file.
 
+## Production environment
+
+For a Render backend, set `DATABASE_PATH` to a persistent-disk location such as `/var/data/english-flashcards.db` and set `CLIENT_ORIGIN` to the deployed frontend origin. The server uses `PORT` when Render provides it.
+
+For a separately deployed frontend, copy `client/.env.example` to `client/.env` and set `VITE_API_BASE_URL` to the backend API base URL, for example `https://example-backend.onrender.com/api`. Leave it blank during local development to use Vite's `/api` proxy.
+
 ## Run the application
 
 Use two terminals from the repository root.

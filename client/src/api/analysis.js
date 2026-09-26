@@ -1,3 +1,5 @@
+import { apiUrl } from './config.js'
+
 async function readJson(response) {
   let data
 
@@ -18,7 +20,7 @@ async function readJson(response) {
 
 export async function analyzeCefrText(text) {
   try {
-    const response = await fetch('/api/analysis/cefr', {
+    const response = await fetch(apiUrl('analysis/cefr'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
@@ -36,7 +38,7 @@ export async function analyzeCefrText(text) {
 
 export async function getVocabularyRecommendations(text, learnerPreferences, useAi = false) {
   try {
-    const response = await fetch('/api/analysis/recommendations', {
+    const response = await fetch(apiUrl('analysis/recommendations'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -58,7 +60,7 @@ export async function getVocabularyRecommendations(text, learnerPreferences, use
 
 export async function prepareVocabularyFromContext(items) {
   try {
-    const response = await fetch('/api/analysis/prepare-vocabulary', {
+    const response = await fetch(apiUrl('analysis/prepare-vocabulary'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items }),
@@ -76,7 +78,7 @@ export async function prepareVocabularyFromContext(items) {
 
 export async function translatePreparedDefinition(meaningEn) {
   try {
-    const response = await fetch('/api/analysis/translate-definition', {
+    const response = await fetch(apiUrl('analysis/translate-definition'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ meaning_en: meaningEn }),

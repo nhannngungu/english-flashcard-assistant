@@ -1,3 +1,5 @@
+import { apiUrl } from './config.js'
+
 function localDayStart(offsetDays) {
   const date = new Date()
   date.setHours(0, 0, 0, 0)
@@ -21,7 +23,7 @@ export async function getDashboardStatistics() {
 
   let response
   try {
-    response = await fetch(`/api/statistics/dashboard?${query}`)
+    response = await fetch(`${apiUrl('statistics/dashboard')}?${query}`)
   } catch {
     throw new Error('Unable to reach the server. Check that the backend is running.')
   }

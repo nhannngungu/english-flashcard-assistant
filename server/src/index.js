@@ -19,8 +19,46 @@ try {
 
 const app = express()
 const port = process.env.PORT || 3000
+const configuredClientOrigins = (process.env.CLIENT_ORIGIN || '')
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/$/, ''))
+  .filter(Boolean)
+const allowedClientOrigins = new Set(configuredClientOrigins)
+
+function isAllowedClientOrigin(origin) {
+  if (allowedClientOrigins.has(origin)) return true
+
+  try {
+    const url = new URL(origin)
+    return (url.protocol === 'http:' || url.protocol === 'https:')
+      && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+  } catch {
+    return false
+  }
+}
 
 app.use(express.json())
+
+app.use((request, response, next) => {
+  const origin = request.get('origin')
+
+  if (origin && !isAllowedClientOrigin(origin)) {
+    return response.status(403).json({ error: 'This origin is not allowed to access the API.' })
+  }
+
+  if (origin) {
+    response.setHeader('Access-Control-Allow-Origin', origin)
+    response.setHeader('Vary', 'Origin')
+    response.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
+    response.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  }
+
+  if (request.method === 'OPTIONS') {
+    return response.sendStatus(204)
+  }
+
+  return next()
+})
 
 app.get('/api/health', (request, response) => {
   db.get('SELECT 1 AS connected', (error) => {

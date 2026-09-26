@@ -1,4 +1,6 @@
-const vocabularySetsApiUrl = '/api/vocabulary-sets'
+import { apiUrl } from './config.js'
+
+const vocabularySetsApiUrl = apiUrl('vocabulary-sets')
 
 async function request(url, options) {
   let response

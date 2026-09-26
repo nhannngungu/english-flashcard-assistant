@@ -1,3 +1,5 @@
+import { apiUrl } from './config.js'
+
 async function readJson(response) {
   let data
 
@@ -21,7 +23,7 @@ export async function extractTextFromImage(image) {
   formData.append('image', image)
 
   try {
-    const response = await fetch('/api/import/ocr', {
+    const response = await fetch(apiUrl('import/ocr'), {
       method: 'POST',
       body: formData,
     })

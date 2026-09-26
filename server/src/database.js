@@ -4,10 +4,20 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url))
-const dataDirectory = join(currentDirectory, '..', 'data')
-const databasePath = join(dataDirectory, 'flashcards.db')
+const localEnvironmentPath = fileURLToPath(new URL('../.env', import.meta.url))
 
-mkdirSync(dataDirectory, { recursive: true })
+try {
+  process.loadEnvFile(localEnvironmentPath)
+} catch (error) {
+  if (error.code !== 'ENOENT') {
+    console.warn(`Could not load server/.env: ${error.message}`)
+  }
+}
+
+const localDatabasePath = join(currentDirectory, '..', 'data', 'flashcards.db')
+const databasePath = process.env.DATABASE_PATH?.trim() || localDatabasePath
+
+mkdirSync(dirname(databasePath), { recursive: true })
 
 const db = new sqlite3.Database(databasePath)
 

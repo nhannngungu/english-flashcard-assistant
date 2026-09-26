@@ -1,4 +1,6 @@
-const vocabularyApiUrl = '/api/vocabularies'
+import { apiUrl } from './config.js'
+
+const vocabularyApiUrl = apiUrl('vocabularies')
 
 async function readJson(response) {
   if (response.status === 204) {
@@ -94,7 +96,7 @@ export function normalizeVocabularyLookup(value) {
 
 export function lookupDictionary(word) {
   const normalizedWord = normalizeVocabularyLookup(word)
-  return request(`/api/dictionary/${encodeURIComponent(normalizedWord)}`)
+  return request(apiUrl(`dictionary/${encodeURIComponent(normalizedWord)}`))
 }
 
 export function lookupImages(word, { partOfSpeech = '', meaningEn = '', page = 1 } = {}) {
@@ -104,5 +106,5 @@ export function lookupImages(word, { partOfSpeech = '', meaningEn = '', page = 1
     page: String(page),
   })
 
-  return request(`/api/images/${encodeURIComponent(word.trim())}?${query}`)
+  return request(`${apiUrl(`images/${encodeURIComponent(word.trim())}`)}?${query}`)
 }
