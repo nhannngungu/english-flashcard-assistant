@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
-import BulkImportSection from './BulkImportSection.jsx'
+import { prepareVocabularyFromContext } from '../api/analysis.js'
+import { extractContainingSentence, extractSurroundingContext } from '../utils/textContext.js'
+import PreparedVocabularyCards from './PreparedVocabularyCards.jsx'
 
 const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'Unknown']
 const advancedLevelGroups = {
@@ -10,8 +12,9 @@ const advancedLevelGroups = {
 function buildUniqueWords(tokens) {
   const words = new Map()
 
-  for (const token of tokens) {
+  tokens.forEach((token, tokenIndex) => {
     const current = words.get(token.normalized)
+    const occurrence = { ...token, tokenIndex }
 
     if (!current) {
       words.set(token.normalized, {
@@ -19,27 +22,45 @@ function buildUniqueWords(tokens) {
         display: token.text,
         level: token.level,
         existing: Boolean(token.existing),
-        occurrences: 1,
+        occurrences: [occurrence],
       })
     } else {
-      current.occurrences += 1
+      current.occurrences.push(occurrence)
       current.existing = current.existing || Boolean(token.existing)
     }
-  }
+  })
 
   return words
 }
 
 function CefrAnalysisPanel({ analysis, onVocabularyCreated, text }) {
   const [enabledLevels, setEnabledLevels] = useState(() => new Set(levels))
-  const [focusedWord, setFocusedWord] = useState('')
+  const [focusedOccurrence, setFocusedOccurrence] = useState(null)
+  const [preferredOccurrences, setPreferredOccurrences] = useState({})
   const [selectedWords, setSelectedWords] = useState(() => new Set())
-  const [preparedWords, setPreparedWords] = useState([])
+  const [preparedItems, setPreparedItems] = useState(null)
+  const [isPreparing, setIsPreparing] = useState(false)
+  const [prepareError, setPrepareError] = useState('')
   const uniqueWords = useMemo(() => buildUniqueWords(analysis.tokens), [analysis.tokens])
-  const focused = focusedWord ? uniqueWords.get(focusedWord) : null
+  const focused = focusedOccurrence ? uniqueWords.get(focusedOccurrence.normalized) : null
+  const focusedToken = focusedOccurrence ? analysis.tokens[focusedOccurrence.tokenIndex] : null
+
+  function selectedOccurrence(word) {
+    const preferredIndex = preferredOccurrences[word.normalized]
+    return analysis.tokens[preferredIndex] || word.occurrences[0]
+  }
+
   const selected = [...selectedWords]
     .map((normalized) => uniqueWords.get(normalized))
     .filter(Boolean)
+    .map((word) => {
+      const occurrence = selectedOccurrence(word)
+      return {
+        ...word,
+        selectedToken: occurrence,
+        sentence: extractContainingSentence(text, occurrence.start, occurrence.end),
+      }
+    })
 
   function toggleLevel(level) {
     setEnabledLevels((currentLevels) => {
@@ -50,9 +71,20 @@ function CefrAnalysisPanel({ analysis, onVocabularyCreated, text }) {
     })
   }
 
+  function clearPreparation() {
+    setPreparedItems(null)
+    setPrepareError('')
+  }
+
   function updateSelection(nextSelection) {
     setSelectedWords(nextSelection)
-    setPreparedWords([])
+    clearPreparation()
+  }
+
+  function handleTokenClick(token, tokenIndex) {
+    setFocusedOccurrence({ normalized: token.normalized, tokenIndex })
+    setPreferredOccurrences((current) => ({ ...current, [token.normalized]: tokenIndex }))
+    if (selectedWords.has(token.normalized)) clearPreparation()
   }
 
   function toggleWordSelection(word) {
@@ -81,24 +113,52 @@ function CefrAnalysisPanel({ analysis, onVocabularyCreated, text }) {
     updateSelection(nextSelection)
   }
 
+  async function handlePrepareSelected() {
+    if (!selected.length || isPreparing) return
+
+    const items = selected.map((word) => {
+      const token = word.selectedToken
+      return {
+        word: token.text,
+        normalized: word.normalized,
+        cefr_level: word.level,
+        sentence: word.sentence,
+        surrounding_context: extractSurroundingContext(text, token.start, token.end),
+      }
+    })
+
+    setIsPreparing(true)
+    setPrepareError('')
+    setPreparedItems(null)
+
+    try {
+      const result = await prepareVocabularyFromContext(items)
+      setPreparedItems(result.items || [])
+    } catch (error) {
+      setPrepareError(error.message)
+    } finally {
+      setIsPreparing(false)
+    }
+  }
+
   function renderHighlightedText() {
     const fragments = []
     let cursor = 0
 
     analysis.tokens.forEach((token, index) => {
-      if (token.start > cursor) {
-        fragments.push(<span key={`gap-${index}`}>{text.slice(cursor, token.start)}</span>)
-      }
+      if (token.start > cursor) fragments.push(<span key={`gap-${index}`}>{text.slice(cursor, token.start)}</span>)
 
       if (enabledLevels.has(token.level)) {
         const isSelected = selectedWords.has(token.normalized)
+        const isFocused = focusedOccurrence?.tokenIndex === index
         fragments.push(
           <button
             aria-label={`${token.text}: ${token.level}${token.existing ? ', already in vocabulary' : ''}`}
+            aria-pressed={isFocused}
             className={`cefr-token cefr-${token.level.toLocaleLowerCase()}${isSelected ? ' selected' : ''}`}
             data-level={token.level}
             key={`token-${index}`}
-            onClick={() => setFocusedWord(token.normalized)}
+            onClick={() => handleTokenClick(token, index)}
             title={`${token.text} — ${token.level}`}
             type="button"
           >
@@ -122,7 +182,7 @@ function CefrAnalysisPanel({ analysis, onVocabularyCreated, text }) {
         <span className="import-step-number" aria-hidden="true">4</span>
         <div>
           <h3 id="cefr-analysis-title">CEFR vocabulary analysis</h3>
-          <p>Filter levels, inspect a word, and choose vocabulary to prepare for lookup.</p>
+          <p>Filter levels, inspect a word, and choose vocabulary to prepare with its sentence context.</p>
         </div>
       </div>
 
@@ -135,28 +195,25 @@ function CefrAnalysisPanel({ analysis, onVocabularyCreated, text }) {
             onClick={() => toggleLevel(level)}
             type="button"
           >
-            <span>{level}</span>
-            <strong>{analysis.summary[level] || 0}</strong>
+            <span>{level}</span><strong>{analysis.summary[level] || 0}</strong>
           </button>
         ))}
       </div>
 
       <p className="cefr-filter-help">Filter counts show occurrences. Turning a filter off keeps the original text visible and removes only that level’s highlighting.</p>
-
-      <div className="cefr-text" aria-label="Analyzed text">
-        {renderHighlightedText()}
-      </div>
+      <div className="cefr-text" aria-label="Analyzed text">{renderHighlightedText()}</div>
 
       <div className="cefr-workspace">
         <section className="cefr-detail" aria-labelledby="cefr-detail-title">
           <h4 id="cefr-detail-title">Word details</h4>
-          {focused ? (
+          {focused && focusedToken ? (
             <>
               <dl>
-                <div><dt>Word</dt><dd>{focused.display}</dd></div>
+                <div><dt>Word</dt><dd>{focusedToken.text}</dd></div>
                 <div><dt>Normalized</dt><dd>{focused.normalized}</dd></div>
                 <div><dt>CEFR level</dt><dd>{focused.level}</dd></div>
-                <div><dt>Occurrences</dt><dd>{focused.occurrences}</dd></div>
+                <div><dt>Occurrences</dt><dd>{focused.occurrences.length}</dd></div>
+                <div><dt>Context</dt><dd>{extractContainingSentence(text, focusedToken.start, focusedToken.end)}</dd></div>
                 <div><dt>Vocabulary status</dt><dd>{focused.existing ? 'Already in vocabulary' : 'Not in vocabulary'}</dd></div>
               </dl>
               <button
@@ -165,13 +222,11 @@ function CefrAnalysisPanel({ analysis, onVocabularyCreated, text }) {
                 onClick={() => toggleWordSelection(focused)}
                 type="button"
               >
-                {focused.existing
-                  ? 'Already added'
-                  : selectedWords.has(focused.normalized) ? 'Remove from selection' : 'Select for learning'}
+                {focused.existing ? 'Already added' : selectedWords.has(focused.normalized) ? 'Remove from selection' : 'Select for learning'}
               </button>
             </>
           ) : (
-            <p>Choose a highlighted word to inspect its normalized form, level, and vocabulary status.</p>
+            <p>Choose a highlighted word to inspect its sentence, normalized form, level, and vocabulary status.</p>
           )}
         </section>
 
@@ -192,34 +247,28 @@ function CefrAnalysisPanel({ analysis, onVocabularyCreated, text }) {
             <div className="cefr-selected-list">
               {selected.map((word) => (
                 <div className="cefr-selected-row" key={word.normalized}>
-                  <span><strong>{word.normalized}</strong> · {word.level} · Not in vocabulary</span>
+                  <span>
+                    <strong>{word.selectedToken.text}</strong> · {word.level} · Not in vocabulary
+                    <small>{word.sentence}</small>
+                  </span>
                   <button className="subtle-button" onClick={() => removeSelectedWord(word.normalized)} type="button">Remove</button>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="cefr-empty-selection">No words selected yet. Repeated words are added only once by normalized form.</p>
+            <p className="cefr-empty-selection">No words selected yet. Repeated words are added only once; the most recently clicked occurrence supplies its context.</p>
           )}
 
-          <button
-            className="primary-button"
-            disabled={!selected.length}
-            onClick={() => setPreparedWords(selected.map((word) => word.normalized))}
-            type="button"
-          >
-            Prepare Selected Words
+          <button className="primary-button" disabled={!selected.length || isPreparing} onClick={handlePrepareSelected} type="button">
+            {isPreparing ? 'Preparing with Context…' : 'Prepare Selected Words'}
           </button>
+          {prepareError && <p className="message error-message" role="alert">{prepareError}</p>}
         </section>
       </div>
 
-      {preparedWords.length > 0 && (
+      {preparedItems && preparedItems.length > 0 && (
         <div className="cefr-prepared-import">
-          <p className="message notice-message">Selected words are prepared below. Lookup and saving remain manual.</p>
-          <BulkImportSection
-            initialWords={preparedWords}
-            key={preparedWords.join('|')}
-            onVocabularyCreated={onVocabularyCreated}
-          />
+          <PreparedVocabularyCards initialItems={preparedItems} onVocabularyCreated={onVocabularyCreated} />
         </div>
       )}
     </section>

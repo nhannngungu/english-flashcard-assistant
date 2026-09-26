@@ -33,3 +33,39 @@ export async function analyzeCefrText(text) {
     throw error
   }
 }
+
+export async function prepareVocabularyFromContext(items) {
+  try {
+    const response = await fetch('/api/analysis/prepare-vocabulary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    })
+
+    return readJson(response)
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error('Unable to reach the server. Check that the backend is running.')
+    }
+
+    throw error
+  }
+}
+
+export async function translatePreparedDefinition(meaningEn) {
+  try {
+    const response = await fetch('/api/analysis/translate-definition', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ meaning_en: meaningEn }),
+    })
+
+    return readJson(response)
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error('Unable to reach the server. Check that the backend is running.')
+    }
+
+    throw error
+  }
+}

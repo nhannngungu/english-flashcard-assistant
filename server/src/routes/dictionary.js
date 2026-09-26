@@ -152,6 +152,14 @@ export function parseFreeDictionaryApiResponse(providerResponse, requestedWord) 
       primaryDefinition,
     ),
     source: providers[0].name,
+    candidates: definitionCandidates.map((candidate, index) => ({
+      definition: cleanText(candidate.definition),
+      example: cleanText(candidate.example),
+      learner_rank: index,
+      part_of_speech: cleanText(candidate.partOfSpeech),
+      reference_word: cleanText(candidate.referenceWord),
+      source: providers[0].name,
+    })),
   }
 
   return hasUsefulDictionaryData(entry) ? entry : null
@@ -211,6 +219,14 @@ export function parseSuvankarResponse(providerResponse, requestedWord) {
     reference_word: cleanText(primaryDefinition?.referenceWord),
     example: selectExampleFromCandidates(candidates, primaryDefinition) || firstExample(entry.examples),
     source: providers[1].name,
+    candidates: rankedCandidates.map((candidate, index) => ({
+      definition: cleanText(candidate.definition),
+      example: cleanText(candidate.example),
+      learner_rank: index,
+      part_of_speech: cleanText(candidate.partOfSpeech),
+      reference_word: cleanText(candidate.referenceWord),
+      source: providers[1].name,
+    })),
   }
 
   return hasUsefulDictionaryData(parsedEntry) ? parsedEntry : null
@@ -255,6 +271,14 @@ export function parseDictionaryApiDevResponse(entries, requestedWord) {
     reference_word: cleanText(primaryDefinition?.referenceWord),
     example: selectExampleFromCandidates(candidates, primaryDefinition),
     source: providers[2].name,
+    candidates: rankedCandidates.map((candidate, index) => ({
+      definition: cleanText(candidate.definition),
+      example: cleanText(candidate.example),
+      learner_rank: index,
+      part_of_speech: cleanText(candidate.partOfSpeech),
+      reference_word: cleanText(candidate.referenceWord),
+      source: providers[2].name,
+    })),
   }
 
   return hasUsefulDictionaryData(parsedEntry) ? parsedEntry : null
@@ -388,6 +412,75 @@ export async function lookupDictionaryProviders(word, { followReferences = true 
   }
 
   if (foundEntry) return { type: 'success', data: aggregate }
+  if (sawNotFound) return { type: 'not-found' }
+  return { type: 'unavailable' }
+}
+
+export async function lookupDictionaryCandidates(word) {
+  const candidates = []
+  const seenCandidates = new Set()
+  const sources = []
+  let phonetic = ''
+  let audioUrl = ''
+  let sawNotFound = false
+  let foundEntry = false
+
+  for (const provider of providers) {
+    const result = await lookupProvider(provider, word)
+
+    if (result.type === 'not-found') {
+      sawNotFound = true
+      continue
+    }
+
+    if (result.type !== 'success') continue
+
+    foundEntry = true
+    phonetic ||= cleanText(result.data.phonetic)
+    audioUrl ||= cleanText(result.data.audio_url)
+    sources.push(provider.name)
+
+    const providerCandidates = Array.isArray(result.data.candidates)
+      ? result.data.candidates
+      : [{
+          definition: result.data.meaning_en,
+          example: result.data.example,
+          part_of_speech: result.data.part_of_speech,
+          source: provider.name,
+        }]
+
+    for (const candidate of providerCandidates.slice(0, 30)) {
+      const definition = cleanText(candidate.definition)
+      const partOfSpeech = cleanText(candidate.part_of_speech)
+      const key = `${definition.toLocaleLowerCase('en-US')}|${partOfSpeech.toLocaleLowerCase('en-US')}`
+
+      if (!definition || cleanText(candidate.reference_word) || seenCandidates.has(key)) continue
+
+      seenCandidates.add(key)
+      candidates.push({
+        definition,
+        example: cleanText(candidate.example),
+        learner_rank: Number(candidate.learner_rank) || 0,
+        part_of_speech: partOfSpeech,
+        source: cleanText(candidate.source) || provider.name,
+      })
+    }
+  }
+
+  if (candidates.length > 0) {
+    return {
+      type: 'success',
+      data: {
+        word,
+        phonetic,
+        audio_url: audioUrl,
+        candidates,
+        sources: [...new Set(sources)],
+      },
+    }
+  }
+
+  if (foundEntry) return { type: 'success', data: { word, phonetic, audio_url: audioUrl, candidates: [], sources } }
   if (sawNotFound) return { type: 'not-found' }
   return { type: 'unavailable' }
 }
