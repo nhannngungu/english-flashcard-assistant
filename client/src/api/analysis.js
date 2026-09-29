@@ -1,95 +1,16 @@
-import { apiUrl } from './config.js'
+import { apiRequest } from './client.js'
 
-async function readJson(response) {
-  let data
-
-  try {
-    data = await response.json()
-  } catch {
-    throw new Error(`The server returned an unexpected response (${response.status}).`)
-  }
-
-  if (!response.ok) {
-    const error = new Error(data.error || 'CEFR analysis failed. Please try again.')
-    error.status = response.status
-    throw error
-  }
-
-  return data
-}
-
-export async function analyzeCefrText(text) {
-  try {
-    const response = await fetch(apiUrl('analysis/cefr'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
-    })
-
-    return readJson(response)
-  } catch (error) {
-    if (error instanceof TypeError) {
-      throw new Error('Unable to reach the server. Check that the backend is running.')
-    }
-
-    throw error
-  }
-}
-
-export async function getVocabularyRecommendations(text, learnerPreferences, useAi = false) {
-  try {
-    const response = await fetch(apiUrl('analysis/recommendations'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text,
-        learner_preferences: learnerPreferences,
-        use_ai: useAi,
-      }),
-    })
-
-    return readJson(response)
-  } catch (error) {
-    if (error instanceof TypeError) {
-      throw new Error('Unable to reach the server. Check that the backend is running.')
-    }
-
-    throw error
-  }
-}
-
-export async function prepareVocabularyFromContext(items) {
-  try {
-    const response = await fetch(apiUrl('analysis/prepare-vocabulary'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items }),
-    })
-
-    return readJson(response)
-  } catch (error) {
-    if (error instanceof TypeError) {
-      throw new Error('Unable to reach the server. Check that the backend is running.')
-    }
-
-    throw error
-  }
-}
-
-export async function translatePreparedDefinition(meaningEn) {
-  try {
-    const response = await fetch(apiUrl('analysis/translate-definition'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ meaning_en: meaningEn }),
-    })
-
-    return readJson(response)
-  } catch (error) {
-    if (error instanceof TypeError) {
-      throw new Error('Unable to reach the server. Check that the backend is running.')
-    }
-
-    throw error
-  }
-}
+export const analyzeCefrText = (text) => apiRequest('analysis/cefr', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }),
+})
+export const getVocabularyRecommendations = (text, learnerPreferences, useAi = false) => apiRequest('analysis/recommendations', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ text, learner_preferences: learnerPreferences, use_ai: useAi }),
+})
+export const prepareVocabularyFromContext = (items) => apiRequest('analysis/prepare-vocabulary', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }),
+})
+export const translatePreparedDefinition = (meaningEn) => apiRequest('analysis/translate-definition', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ meaning_en: meaningEn }),
+})

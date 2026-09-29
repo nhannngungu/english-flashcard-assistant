@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { calculateReviewSchedule, toSqliteUtc } from './spacedRepetition.js'
+import { calculateReviewSchedule } from './spacedRepetition.js'
 
 const now = new Date('2026-09-26T12:00:00.000Z')
 
@@ -26,5 +26,5 @@ test('later reviews use the previous interval and ease factor', () => {
   })
 
   assert.equal(schedule.intervalDays, 10)
-  assert.equal(toSqliteUtc(schedule.nextReviewAt), '2026-10-06 12:00:00')
+  assert.equal(schedule.nextReviewAt.toISOString(), '2026-10-06T12:00:00.000Z')
 })

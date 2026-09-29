@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createVocabulary, lookupDictionary, lookupImages } from '../api/vocabularies.js'
-import { createVocabularySet, getAllVocabularySets } from '../api/vocabularySets.js'
+import { createVocabularySetWithVocabularies, getAllVocabularySets } from '../api/vocabularySets.js'
 import BulkImportSection from '../components/BulkImportSection.jsx'
 import ImageSuggestions from '../components/ImageSuggestions.jsx'
 import VocabularyFormFields from '../components/VocabularyFormFields.jsx'
@@ -156,16 +156,19 @@ function AddWordsPage({ onVocabularyCreated }) {
         if (!existingSetId) throw new Error('Choose an existing vocabulary set.')
         setId = Number(existingSetId)
       } else if (setChoice === 'new') {
-        const vocabularySet = await createVocabularySet({
+        const result = await createVocabularySetWithVocabularies({
           title: setTitle,
           cover_image_url: setCoverImageUrl,
+          vocabularies: [form],
         })
-        createdSet = vocabularySet
-        setId = vocabularySet.id
-        setAvailableSets((sets) => [{ ...vocabularySet, word_count: 0 }, ...sets])
+        createdSet = result.set
+        setId = result.set.id
+        setAvailableSets((sets) => [result.set, ...sets])
+        const vocabulary = result.vocabularies[0]
+        setMessage(`“${vocabulary.word}” was added successfully.`)
       }
 
-      const vocabulary = await createVocabulary({ ...form, set_id: setId })
+      const vocabulary = createdSet ? null : await createVocabulary({ ...form, set_id: setId })
       setForm(initialForm)
       setDictionarySource('')
       setTranslationSource('')
@@ -182,7 +185,7 @@ function AddWordsPage({ onVocabularyCreated }) {
         setSetChoice('existing')
         setExistingSetId(String(createdSet.id))
       }
-      setMessage(`“${vocabulary.word}” was added successfully.`)
+      if (vocabulary) setMessage(`“${vocabulary.word}” was added successfully.`)
       onVocabularyCreated()
     } catch (requestError) {
       setError(requestError.message)

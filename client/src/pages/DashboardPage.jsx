@@ -25,7 +25,7 @@ const emptyStatistics = {
   recentActivity: [],
 }
 
-function sqliteUtcDate(value) {
+function apiDate(value) {
   if (!value) return null
   const normalized = value.includes('T') ? value : `${value.replace(' ', 'T')}Z`
   const date = new Date(normalized)
@@ -33,12 +33,12 @@ function sqliteUtcDate(value) {
 }
 
 function formatLocalDate(value) {
-  const date = sqliteUtcDate(value)
+  const date = apiDate(value)
   return date ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(date) : 'Unknown date'
 }
 
 function formatLocalDateTime(value) {
-  const date = sqliteUtcDate(value)
+  const date = apiDate(value)
   return date
     ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date)
     : 'Unknown time'

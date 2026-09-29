@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import {
-  createVocabulary,
   getVocabularies,
   lookupDictionary,
   lookupImages,
 } from '../api/vocabularies.js'
 import ImageSuggestions from './ImageSuggestions.jsx'
 import VocabularySetFields from './VocabularySetFields.jsx'
-import { createVocabularySet } from '../api/vocabularySets.js'
+import { createVocabularySetWithVocabularies } from '../api/vocabularySets.js'
 import { parseBulkWords, runWithConcurrency } from '../utils/bulkImport.js'
 
 const editableFields = [
@@ -273,13 +272,26 @@ function BulkImportSection({ initialWords = [], onVocabularyCreated = () => {} }
     const newItems = selectedItems.filter(
       (item) => !existingWords.has(item.word.trim().toLocaleLowerCase('en-US')),
     )
-    let vocabularySet
-
     if (newItems.length > 0) {
       try {
-        vocabularySet = await createVocabularySet({ title: setTitle, cover_image_url: setCoverImageUrl })
+        await createVocabularySetWithVocabularies({
+          title: setTitle,
+          cover_image_url: setCoverImageUrl,
+          vocabularies: newItems.map((item) => ({
+            word: item.word,
+            phonetic: item.phonetic,
+            meaning_vi: item.meaning_vi,
+            meaning_en: item.meaning_en,
+            part_of_speech: item.part_of_speech,
+            example: item.example,
+            audio_url: item.audio_url,
+            image_url: item.image_url,
+            status: 'new',
+          })),
+        })
       } catch (error) {
-        setBatchError(`Could not create the vocabulary set: ${error.message}`)
+        setBatchError(`Could not save the vocabulary set: ${error.message}`)
+        for (const item of newItems) updateItem(item.id, { saveStatus: 'failed', saveError: error.message })
         setIsSaving(false)
         return
       }
@@ -294,28 +306,9 @@ function BulkImportSection({ initialWords = [], onVocabularyCreated = () => {} }
         continue
       }
 
-      updateItem(item.id, { saveStatus: 'saving', saveError: '' })
-
-      try {
-        await createVocabulary({
-          word: item.word,
-          phonetic: item.phonetic,
-          meaning_vi: item.meaning_vi,
-          meaning_en: item.meaning_en,
-          part_of_speech: item.part_of_speech,
-          example: item.example,
-          audio_url: item.audio_url,
-          image_url: item.image_url,
-          set_id: vocabularySet?.id || null,
-          status: 'new',
-        })
-        existingWords.add(normalizedWord)
-        result.saved += 1
-        updateItem(item.id, { saveStatus: 'saved', saveError: '', selected: false })
-      } catch (error) {
-        result.failed += 1
-        updateItem(item.id, { saveStatus: 'failed', saveError: error.message })
-      }
+      existingWords.add(normalizedWord)
+      result.saved += 1
+      updateItem(item.id, { saveStatus: 'saved', saveError: '', selected: false })
     }
 
     setSummary(`${result.saved} saved, ${result.skipped} skipped, ${result.failed} failed`)

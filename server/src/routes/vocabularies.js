@@ -1,379 +1,183 @@
-import { Router } from 'express'
-import db from '../database.js'
-import {
-  calculateReviewSchedule,
-  reviewRatings,
-  toSqliteUtc,
-} from '../services/spacedRepetition.js'
+import { withTransaction } from '../database.js'
+import { createAsyncRouter } from '../middleware/asyncRoute.js'
+import { calculateReviewSchedule, reviewRatings } from '../services/spacedRepetition.js'
 
-const router = Router()
 const allowedStatuses = ['new', 'learning', 'learned']
+const optionalText = (value) => typeof value === 'string' ? value.trim() : ''
 
-function getVocabularyId(value) {
+function positiveInteger(value) {
   const id = Number(value)
-
-  if (!Number.isInteger(id) || id <= 0) {
-    return null
-  }
-
-  return id
+  return Number.isSafeInteger(id) && id > 0 ? id : null
 }
 
-function optionalText(value) {
-  if (typeof value !== 'string') {
-    return ''
-  }
-
-  return value.trim()
-}
-
-function getVocabularyInput(body = {}) {
+export function parseVocabularyInput(body = {}) {
   const word = optionalText(body.word)
   const status = body.status === undefined ? 'new' : optionalText(body.status)
   const meaningEn = optionalText(body.meaning_en) || optionalText(body.meaning)
   const hasSetId = Object.hasOwn(body, 'set_id')
-  const setId = body.set_id === undefined || body.set_id === null || body.set_id === ''
-    ? null
-    : getVocabularyId(body.set_id)
+  const setId = body.set_id === undefined || body.set_id === null || body.set_id === '' ? null : positiveInteger(body.set_id)
+  if (!word) return { error: 'word is required and cannot be empty.' }
+  if (!allowedStatuses.includes(status)) return { error: 'status must be one of: new, learning, learned.' }
+  if (hasSetId && body.set_id !== null && body.set_id !== '' && !setId) return { error: 'set_id must be a positive integer or null.' }
 
-  if (!word) {
-    return { error: 'word is required and cannot be empty.' }
-  }
-
-  if (!allowedStatuses.includes(status)) {
-    return { error: 'status must be one of: new, learning, learned.' }
-  }
-
-  if (body.set_id !== undefined && body.set_id !== null && body.set_id !== '' && !setId) {
-    return { error: 'set_id must be a positive integer or null.' }
-  }
-
-  return {
-    value: {
-      word,
-      meaningEn,
-      meaningVi: body.meaning_vi === undefined ? null : optionalText(body.meaning_vi),
-      partOfSpeech: optionalText(body.part_of_speech),
-      example: optionalText(body.example),
-      imageUrl: optionalText(body.image_url),
-      phonetic: optionalText(body.phonetic),
-      audioUrl: optionalText(body.audio_url),
-      setId,
-      hasSetId,
-      status,
-    },
-  }
+  return { value: {
+    word,
+    meaningEn,
+    meaningVi: body.meaning_vi === undefined ? null : optionalText(body.meaning_vi),
+    partOfSpeech: optionalText(body.part_of_speech),
+    example: optionalText(body.example),
+    imageUrl: optionalText(body.image_url),
+    phonetic: optionalText(body.phonetic),
+    audioUrl: optionalText(body.audio_url),
+    setId,
+    hasSetId,
+    status,
+  } }
 }
 
-function sendDatabaseError(response, error) {
-  console.error(error.message)
-  return response.status(500).json({ error: 'A database error occurred.' })
+async function verifyOwnedSet(database, setId, userId) {
+  if (setId === null) return true
+  const result = await database.query('SELECT 1 FROM vocabulary_sets WHERE id = $1 AND user_id = $2', [setId, userId])
+  return result.rowCount > 0
 }
-
-router.get('/', (request, response) => {
-  db.all('SELECT * FROM vocabularies ORDER BY id DESC', (error, rows) => {
-    if (error) {
-      return sendDatabaseError(response, error)
-    }
-
-    return response.json(rows)
-  })
-})
 
 const latestReviewJoin = `
-  LEFT JOIN review_history latest_review
-    ON latest_review.id = (
-      SELECT history.id
-      FROM review_history history
-      WHERE history.vocabulary_id = vocabulary.id
-      ORDER BY datetime(history.reviewed_at) DESC, history.id DESC
-      LIMIT 1
-    )
+  LEFT JOIN LATERAL (
+    SELECT history.id, history.next_review_at, history.interval_days, history.ease_factor
+    FROM review_history history
+    WHERE history.vocabulary_id = vocabulary.id AND history.user_id = vocabulary.user_id
+    ORDER BY history.reviewed_at DESC, history.id DESC
+    LIMIT 1
+  ) latest_review ON TRUE
 `
 
-router.get('/review/smart', (request, response) => {
-  const query = `
-    SELECT vocabulary.*,
-           latest_review.next_review_at,
-           latest_review.interval_days,
-           latest_review.ease_factor
-    FROM vocabularies vocabulary
-    ${latestReviewJoin}
-    WHERE
-      (latest_review.id IS NULL AND vocabulary.status IN ('new', 'learning'))
-      OR datetime(latest_review.next_review_at) <= CURRENT_TIMESTAMP
-    ORDER BY
-      CASE WHEN latest_review.id IS NULL THEN 1 ELSE 0 END,
-      datetime(latest_review.next_review_at) ASC,
-      vocabulary.id ASC
-  `
+export default function createVocabularyRouter(database) {
+  const router = createAsyncRouter()
 
-  db.all(query, (error, rows) => {
-    if (error) return sendDatabaseError(response, error)
-    return response.json(rows)
+  router.get('/', async (request, response) => {
+    const result = await database.query('SELECT * FROM vocabularies WHERE user_id = $1 ORDER BY id DESC', [request.user.id])
+    return response.json(result.rows)
   })
-})
 
-router.post('/:id/review', (request, response) => {
-  const id = getVocabularyId(request.params.id)
-  const rating = optionalText(request.body.rating).toLocaleLowerCase('en-US')
+  router.get('/review/smart', async (request, response) => {
+    const result = await database.query(
+      `SELECT vocabulary.*, latest_review.next_review_at, latest_review.interval_days, latest_review.ease_factor
+       FROM vocabularies vocabulary ${latestReviewJoin}
+       WHERE vocabulary.user_id = $1
+         AND ((latest_review.id IS NULL AND vocabulary.status IN ('new', 'learning')) OR latest_review.next_review_at <= CURRENT_TIMESTAMP)
+       ORDER BY CASE WHEN latest_review.id IS NULL THEN 1 ELSE 0 END, latest_review.next_review_at ASC, vocabulary.id ASC`,
+      [request.user.id],
+    )
+    return response.json(result.rows)
+  })
 
-  if (!id) return response.status(400).json({ error: 'id must be a positive integer.' })
-  if (!reviewRatings.has(rating)) {
-    return response.status(400).json({ error: 'rating must be one of: again, hard, good, easy.' })
-  }
+  router.post('/:id/review', async (request, response) => {
+    const id = positiveInteger(request.params.id)
+    const rating = optionalText(request.body?.rating).toLocaleLowerCase('en-US')
+    if (!id) return response.status(400).json({ error: 'id must be a positive integer.' })
+    if (!reviewRatings.has(rating)) return response.status(400).json({ error: 'rating must be one of: again, hard, good, easy.' })
 
-  const query = `
-    SELECT vocabulary.*,
-           latest_review.interval_days AS previous_interval_days,
-           latest_review.ease_factor AS previous_ease_factor,
-           (SELECT COUNT(*) FROM review_history WHERE vocabulary_id = vocabulary.id) AS review_count
-    FROM vocabularies vocabulary
-    ${latestReviewJoin}
-    WHERE vocabulary.id = ?
-  `
-
-  db.get(query, [id], (selectError, vocabulary) => {
-    if (selectError) return sendDatabaseError(response, selectError)
-    if (!vocabulary) return response.status(404).json({ error: 'Vocabulary not found.' })
-
-    const schedule = calculateReviewSchedule({
-      rating,
-      previousIntervalDays: Number(vocabulary.previous_interval_days) || 0,
-      previousEaseFactor: Number(vocabulary.previous_ease_factor) || 2.5,
-      reviewCount: Number(vocabulary.review_count) || 0,
-    })
-    const nextReviewAt = toSqliteUtc(schedule.nextReviewAt)
-    const nextStatus = rating === 'again' || rating === 'hard' ? 'learning' : 'learned'
-
-    db.run('BEGIN TRANSACTION', (beginError) => {
-      if (beginError) return sendDatabaseError(response, beginError)
-
-      db.run(
-        `
-          INSERT INTO review_history
-            (vocabulary_id, rating, next_review_at, interval_days, ease_factor)
-          VALUES (?, ?, ?, ?, ?)
-        `,
-        [id, rating, nextReviewAt, schedule.intervalDays, schedule.easeFactor],
-        function insertReview(insertError) {
-          if (insertError) {
-            return db.run('ROLLBACK', () => sendDatabaseError(response, insertError))
-          }
-
-          const reviewHistoryId = this.lastID
-          db.run(
-            'UPDATE vocabularies SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-            [nextStatus, id],
-            (updateError) => {
-              if (updateError) {
-                return db.run('ROLLBACK', () => sendDatabaseError(response, updateError))
-              }
-
-              db.run('COMMIT', (commitError) => {
-                if (commitError) return sendDatabaseError(response, commitError)
-
-                db.get('SELECT * FROM vocabularies WHERE id = ?', [id], (finalError, updatedVocabulary) => {
-                  if (finalError) return sendDatabaseError(response, finalError)
-                  return response.json({
-                    vocabulary: updatedVocabulary,
-                    review: {
-                      id: reviewHistoryId,
-                      rating,
-                      next_review_at: nextReviewAt,
-                      interval_days: schedule.intervalDays,
-                      ease_factor: schedule.easeFactor,
-                    },
-                  })
-                })
-              })
-            },
-          )
-        },
+    const result = await withTransaction(database, async (client) => {
+      const selected = await client.query(
+        'SELECT * FROM vocabularies WHERE id = $1 AND user_id = $2 FOR UPDATE',
+        [id, request.user.id],
       )
+      const vocabulary = selected.rows[0]
+      if (!vocabulary) return null
+
+      const reviewState = await client.query(
+        `SELECT interval_days, ease_factor,
+                COUNT(*) OVER () AS review_count
+         FROM review_history
+         WHERE vocabulary_id = $1 AND user_id = $2
+         ORDER BY reviewed_at DESC, id DESC LIMIT 1`,
+        [id, request.user.id],
+      )
+      const previousReview = reviewState.rows[0]
+
+      const schedule = calculateReviewSchedule({
+        rating,
+        previousIntervalDays: Number(previousReview?.interval_days) || 0,
+        previousEaseFactor: Number(previousReview?.ease_factor) || 2.5,
+        reviewCount: Number(previousReview?.review_count) || 0,
+      })
+      const nextStatus = rating === 'again' || rating === 'hard' ? 'learning' : 'learned'
+      const inserted = await client.query(
+        `INSERT INTO review_history (user_id, vocabulary_id, rating, next_review_at, interval_days, ease_factor)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, rating, next_review_at, interval_days, ease_factor`,
+        [request.user.id, id, rating, schedule.nextReviewAt, schedule.intervalDays, schedule.easeFactor],
+      )
+      const updated = await client.query(
+        'UPDATE vocabularies SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND user_id = $3 RETURNING *',
+        [nextStatus, id, request.user.id],
+      )
+      return { vocabulary: updated.rows[0], review: inserted.rows[0] }
     })
+
+    if (!result) return response.status(404).json({ error: 'Vocabulary not found.' })
+    return response.json(result)
   })
-})
 
-router.get('/:id', (request, response) => {
-  const id = getVocabularyId(request.params.id)
-
-  if (!id) {
-    return response.status(400).json({ error: 'id must be a positive integer.' })
-  }
-
-  db.get('SELECT * FROM vocabularies WHERE id = ?', [id], (error, row) => {
-    if (error) {
-      return sendDatabaseError(response, error)
-    }
-
-    if (!row) {
-      return response.status(404).json({ error: 'Vocabulary not found.' })
-    }
-
-    return response.json(row)
+  router.get('/:id', async (request, response) => {
+    const id = positiveInteger(request.params.id)
+    if (!id) return response.status(400).json({ error: 'id must be a positive integer.' })
+    const result = await database.query('SELECT * FROM vocabularies WHERE id = $1 AND user_id = $2', [id, request.user.id])
+    if (!result.rows[0]) return response.status(404).json({ error: 'Vocabulary not found.' })
+    return response.json(result.rows[0])
   })
-})
 
-router.post('/', (request, response) => {
-  const input = getVocabularyInput(request.body)
+  router.post('/', async (request, response) => {
+    const input = parseVocabularyInput(request.body)
+    if (input.error) return response.status(400).json({ error: input.error })
+    const values = input.value
+    if (!await verifyOwnedSet(database, values.setId, request.user.id)) return response.status(404).json({ error: 'Vocabulary set not found.' })
+    const result = await database.query(
+      `INSERT INTO vocabularies
+         (user_id, word, meaning, meaning_en, meaning_vi, part_of_speech, example, image_url, phonetic, audio_url, set_id, status)
+       VALUES ($1, $2, $3, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [request.user.id, values.word, values.meaningEn, values.meaningVi ?? '', values.partOfSpeech, values.example, values.imageUrl, values.phonetic, values.audioUrl, values.setId, values.status],
+    )
+    return response.status(201).json(result.rows[0])
+  })
 
-  if (input.error) {
-    return response.status(400).json({ error: input.error })
-  }
+  router.put('/:id', async (request, response) => {
+    const id = positiveInteger(request.params.id)
+    if (!id) return response.status(400).json({ error: 'id must be a positive integer.' })
+    const input = parseVocabularyInput(request.body)
+    if (input.error) return response.status(400).json({ error: input.error })
+    const values = input.value
+    if (values.hasSetId && !await verifyOwnedSet(database, values.setId, request.user.id)) return response.status(404).json({ error: 'Vocabulary set not found.' })
+    const result = await database.query(
+      `UPDATE vocabularies SET word = $1, meaning = $2, meaning_en = $2, meaning_vi = COALESCE($3, meaning_vi),
+         part_of_speech = $4, example = $5, image_url = $6, phonetic = $7, audio_url = $8,
+         set_id = CASE WHEN $9::boolean THEN $10 ELSE set_id END, status = $11, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $12 AND user_id = $13 RETURNING *`,
+      [values.word, values.meaningEn, values.meaningVi, values.partOfSpeech, values.example, values.imageUrl, values.phonetic, values.audioUrl, values.hasSetId, values.setId, values.status, id, request.user.id],
+    )
+    if (!result.rows[0]) return response.status(404).json({ error: 'Vocabulary not found.' })
+    return response.json(result.rows[0])
+  })
 
-  const values = input.value
-  const query = `
-    INSERT INTO vocabularies
-      (word, meaning, meaning_en, meaning_vi, part_of_speech, example, image_url, phonetic, audio_url, set_id, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `
+  router.patch('/:id/status', async (request, response) => {
+    const id = positiveInteger(request.params.id)
+    const status = optionalText(request.body?.status)
+    if (!id) return response.status(400).json({ error: 'id must be a positive integer.' })
+    if (!allowedStatuses.includes(status)) return response.status(400).json({ error: 'status must be one of: new, learning, learned.' })
+    const result = await database.query(
+      'UPDATE vocabularies SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND user_id = $3 RETURNING *',
+      [status, id, request.user.id],
+    )
+    if (!result.rows[0]) return response.status(404).json({ error: 'Vocabulary not found.' })
+    return response.json(result.rows[0])
+  })
 
-  db.run(
-    query,
-    [
-      values.word,
-      values.meaningEn,
-      values.meaningEn,
-      values.meaningVi ?? '',
-      values.partOfSpeech,
-      values.example,
-      values.imageUrl,
-      values.phonetic,
-      values.audioUrl,
-      values.setId,
-      values.status,
-    ],
-    function insertVocabulary(error) {
-      if (error) {
-        return sendDatabaseError(response, error)
-      }
-
-      db.get('SELECT * FROM vocabularies WHERE id = ?', [this.lastID], (selectError, row) => {
-        if (selectError) {
-          return sendDatabaseError(response, selectError)
-        }
-
-        return response.status(201).json(row)
-      })
-    },
-  )
-})
-
-router.put('/:id', (request, response) => {
-  const id = getVocabularyId(request.params.id)
-
-  if (!id) {
-    return response.status(400).json({ error: 'id must be a positive integer.' })
-  }
-
-  const input = getVocabularyInput(request.body)
-
-  if (input.error) {
-    return response.status(400).json({ error: input.error })
-  }
-
-  const values = input.value
-  const query = `
-    UPDATE vocabularies
-    SET word = ?, meaning = ?, meaning_en = ?, meaning_vi = COALESCE(?, meaning_vi),
-        part_of_speech = ?, example = ?, image_url = ?,
-        phonetic = ?, audio_url = ?,
-        set_id = CASE WHEN ? THEN ? ELSE set_id END,
-        status = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `
-
-  db.run(
-    query,
-    [
-      values.word,
-      values.meaningEn,
-      values.meaningEn,
-      values.meaningVi,
-      values.partOfSpeech,
-      values.example,
-      values.imageUrl,
-      values.phonetic,
-      values.audioUrl,
-      values.hasSetId ? 1 : 0,
-      values.setId,
-      values.status,
-      id,
-    ],
-    function updateVocabulary(error) {
-      if (error) {
-        return sendDatabaseError(response, error)
-      }
-
-      if (this.changes === 0) {
-        return response.status(404).json({ error: 'Vocabulary not found.' })
-      }
-
-      db.get('SELECT * FROM vocabularies WHERE id = ?', [id], (selectError, row) => {
-        if (selectError) {
-          return sendDatabaseError(response, selectError)
-        }
-
-        return response.json(row)
-      })
-    },
-  )
-})
-
-router.patch('/:id/status', (request, response) => {
-  const id = getVocabularyId(request.params.id)
-  const status = optionalText(request.body.status)
-
-  if (!id) {
-    return response.status(400).json({ error: 'id must be a positive integer.' })
-  }
-
-  if (!allowedStatuses.includes(status)) {
-    return response.status(400).json({ error: 'status must be one of: new, learning, learned.' })
-  }
-
-  db.run(
-    'UPDATE vocabularies SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    [status, id],
-    function updateStatus(error) {
-      if (error) {
-        return sendDatabaseError(response, error)
-      }
-
-      if (this.changes === 0) {
-        return response.status(404).json({ error: 'Vocabulary not found.' })
-      }
-
-      db.get('SELECT * FROM vocabularies WHERE id = ?', [id], (selectError, row) => {
-        if (selectError) {
-          return sendDatabaseError(response, selectError)
-        }
-
-        return response.json(row)
-      })
-    },
-  )
-})
-
-router.delete('/:id', (request, response) => {
-  const id = getVocabularyId(request.params.id)
-
-  if (!id) {
-    return response.status(400).json({ error: 'id must be a positive integer.' })
-  }
-
-  db.run('DELETE FROM vocabularies WHERE id = ?', [id], function deleteVocabulary(error) {
-    if (error) {
-      return sendDatabaseError(response, error)
-    }
-
-    if (this.changes === 0) {
-      return response.status(404).json({ error: 'Vocabulary not found.' })
-    }
-
+  router.delete('/:id', async (request, response) => {
+    const id = positiveInteger(request.params.id)
+    if (!id) return response.status(400).json({ error: 'id must be a positive integer.' })
+    const result = await database.query('DELETE FROM vocabularies WHERE id = $1 AND user_id = $2', [id, request.user.id])
+    if (result.rowCount === 0) return response.status(404).json({ error: 'Vocabulary not found.' })
     return response.status(204).send()
   })
-})
 
-export default router
+  return router
+}

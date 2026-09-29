@@ -1,198 +1,102 @@
-import { Router } from 'express'
-import db from '../database.js'
+import { createAsyncRouter } from '../middleware/asyncRoute.js'
 import { parseDashboardTimeWindow, percentage } from '../services/dashboardStatistics.js'
 
-const router = Router()
-
-function dbGet(query, parameters = []) {
-  return new Promise((resolve, reject) => {
-    db.get(query, parameters, (error, row) => error ? reject(error) : resolve(row))
-  })
+const inRange = (value, start, end) => {
+  const time = new Date(value).getTime()
+  return time >= new Date(start).getTime() && time < new Date(end).getTime()
 }
 
-function dbAll(query, parameters = []) {
-  return new Promise((resolve, reject) => {
-    db.all(query, parameters, (error, rows) => error ? reject(error) : resolve(rows))
-  })
-}
+export default function createStatisticsRouter(database) {
+  const router = createAsyncRouter()
 
-function count(value) {
-  return Number(value) || 0
-}
+  router.get('/dashboard', async (request, response) => {
+    const window = parseDashboardTimeWindow(request.query)
+    if (!window) return response.status(400).json({ error: 'Valid local-day UTC boundaries and timezone_offset_minutes are required.' })
 
-router.get('/dashboard', async (request, response) => {
-  const window = parseDashboardTimeWindow(request.query)
-  if (!window) {
-    return response.status(400).json({
-      error: 'Valid local-day UTC boundaries and timezone_offset_minutes are required.',
-    })
-  }
-
-  const localTimeModifier = `${-window.timezoneOffset >= 0 ? '+' : ''}${-window.timezoneOffset} minutes`
-  const dayRows = window.activityStarts.slice(0, 7).map((start, index) => ({
-    index,
-    start,
-    end: window.activityStarts[index + 1],
-  }))
-  const dayValues = dayRows.map(() => '(?, ?, ?)').join(', ')
-  const dayParameters = dayRows.flatMap((day) => [day.index, day.start, day.end])
-  const latestReviews = `
-    SELECT review.*
-    FROM review_history review
-    WHERE review.id = (
-      SELECT candidate.id
-      FROM review_history candidate
-      WHERE candidate.vocabulary_id = review.vocabulary_id
-      ORDER BY datetime(candidate.reviewed_at) DESC, candidate.id DESC
-      LIMIT 1
-    )
-  `
-
-  try {
-    const [summaryRow, ratingRow, activityRows, upcomingRow, setCountRow, recentSets, recentActivity] = await Promise.all([
-      dbGet(
-        `
-          SELECT
-            COUNT(*) AS total_vocabulary,
-            COALESCE(SUM(CASE WHEN vocabulary.status = 'new'
-              OR NOT EXISTS (SELECT 1 FROM review_history history WHERE history.vocabulary_id = vocabulary.id)
-              THEN 1 ELSE 0 END), 0) AS new_count,
-            COALESCE(SUM(CASE WHEN vocabulary.status = 'learning' THEN 1 ELSE 0 END), 0) AS learning_count,
-            COALESCE(SUM(CASE WHEN vocabulary.status = 'learned' THEN 1 ELSE 0 END), 0) AS learned_count,
-            COALESCE(SUM(CASE WHEN datetime((
-              SELECT history.next_review_at
-              FROM review_history history
-              WHERE history.vocabulary_id = vocabulary.id
-              ORDER BY datetime(history.reviewed_at) DESC, history.id DESC
-              LIMIT 1
-            )) <= CURRENT_TIMESTAMP THEN 1 ELSE 0 END), 0) AS due_now,
-            (SELECT COUNT(*) FROM review_history
-              WHERE datetime(reviewed_at) >= datetime(?) AND datetime(reviewed_at) < datetime(?)) AS reviewed_today
-          FROM vocabularies vocabulary
-        `,
-        [window.todayStart, window.tomorrowStart],
+    const userId = request.user.id
+    const [vocabularyResult, historyResult, setResult] = await Promise.all([
+      database.query('SELECT id, word, status, set_id, created_at FROM vocabularies WHERE user_id = $1', [userId]),
+      database.query(
+        `SELECT id, vocabulary_id, rating, reviewed_at, next_review_at, interval_days, ease_factor
+         FROM review_history WHERE user_id = $1 ORDER BY reviewed_at DESC, id DESC`,
+        [userId],
       ),
-      dbGet(
-        `
-          SELECT
-            COUNT(*) AS total,
-            COALESCE(SUM(CASE WHEN rating = 'again' THEN 1 ELSE 0 END), 0) AS again_count,
-            COALESCE(SUM(CASE WHEN rating = 'hard' THEN 1 ELSE 0 END), 0) AS hard_count,
-            COALESCE(SUM(CASE WHEN rating = 'good' THEN 1 ELSE 0 END), 0) AS good_count,
-            COALESCE(SUM(CASE WHEN rating = 'easy' THEN 1 ELSE 0 END), 0) AS easy_count,
-            COUNT(DISTINCT date(reviewed_at, ?)) AS active_days
-          FROM review_history
-        `,
-        [localTimeModifier],
-      ),
-      dbAll(
-        `
-          WITH days(day_index, start_utc, end_utc) AS (VALUES ${dayValues})
-          SELECT
-            days.day_index,
-            days.start_utc,
-            (SELECT COUNT(*) FROM review_history history
-              WHERE datetime(history.reviewed_at) >= datetime(days.start_utc)
-                AND datetime(history.reviewed_at) < datetime(days.end_utc)) AS reviews,
-            (SELECT COUNT(*) FROM vocabularies vocabulary
-              WHERE datetime(vocabulary.created_at) >= datetime(days.start_utc)
-                AND datetime(vocabulary.created_at) < datetime(days.end_utc)) AS added
-          FROM days
-          ORDER BY days.day_index
-        `,
-        dayParameters,
-      ),
-      dbGet(
-        `
-          WITH latest_review AS (${latestReviews})
-          SELECT
-            COALESCE(SUM(CASE WHEN datetime(next_review_at) < datetime(?) THEN 1 ELSE 0 END), 0) AS due_through_today,
-            COALESCE(SUM(CASE WHEN datetime(next_review_at) >= datetime(?) AND datetime(next_review_at) < datetime(?) THEN 1 ELSE 0 END), 0) AS tomorrow,
-            COALESCE(SUM(CASE WHEN datetime(next_review_at) >= datetime(?) AND datetime(next_review_at) < datetime(?) THEN 1 ELSE 0 END), 0) AS next_seven_days
-          FROM latest_review
-        `,
-        [
-          window.tomorrowStart,
-          window.tomorrowStart,
-          window.dayAfterTomorrowStart,
-          window.dayAfterTomorrowStart,
-          window.nextSevenDaysEnd,
-        ],
-      ),
-      dbGet('SELECT COUNT(*) AS total FROM vocabulary_sets'),
-      dbAll(
-        `
-          SELECT vocabulary_set.*, COUNT(vocabulary.id) AS word_count
-          FROM vocabulary_sets vocabulary_set
-          LEFT JOIN vocabularies vocabulary ON vocabulary.set_id = vocabulary_set.id
-          GROUP BY vocabulary_set.id
-          ORDER BY datetime(vocabulary_set.created_at) DESC, vocabulary_set.id DESC
-          LIMIT 3
-        `,
-      ),
-      dbAll(
-        `
-          SELECT history.id, history.rating, history.reviewed_at,
-                 vocabulary.id AS vocabulary_id, vocabulary.word
-          FROM review_history history
-          JOIN vocabularies vocabulary ON vocabulary.id = history.vocabulary_id
-          ORDER BY datetime(history.reviewed_at) DESC, history.id DESC
-          LIMIT 5
-        `,
-      ),
+      database.query('SELECT * FROM vocabulary_sets WHERE user_id = $1 ORDER BY created_at DESC, id DESC', [userId]),
     ])
 
-    const totalReviews = count(ratingRow.total)
-    const activeDays = count(ratingRow.active_days)
-    const ratingCounts = {
-      again: count(ratingRow.again_count),
-      hard: count(ratingRow.hard_count),
-      good: count(ratingRow.good_count),
-      easy: count(ratingRow.easy_count),
+    const vocabularies = vocabularyResult.rows
+    const history = historyResult.rows
+    const sets = setResult.rows
+    const vocabularyById = new Map(vocabularies.map((word) => [String(word.id), word]))
+    const latestReviewByVocabulary = new Map()
+    for (const review of history) {
+      const key = String(review.vocabulary_id)
+      if (!latestReviewByVocabulary.has(key)) latestReviewByVocabulary.set(key, review)
+    }
+
+    const now = Date.now()
+    const ratingCounts = { again: 0, hard: 0, good: 0, easy: 0 }
+    const activeDates = new Set()
+    for (const review of history) {
+      if (Object.hasOwn(ratingCounts, review.rating)) ratingCounts[review.rating] += 1
+      const localTime = new Date(review.reviewed_at).getTime() - window.timezoneOffset * 60_000
+      activeDates.add(new Date(localTime).toISOString().slice(0, 10))
+    }
+
+    const dayRows = window.activityStarts.slice(0, 7).map((start, index) => {
+      const end = window.activityStarts[index + 1]
+      return {
+        startUtc: start,
+        reviews: history.filter((review) => inRange(review.reviewed_at, start, end)).length,
+        added: vocabularies.filter((word) => inRange(word.created_at, start, end)).length,
+      }
+    })
+
+    const latestReviews = [...latestReviewByVocabulary.values()]
+    const totalReviews = history.length
+    const activeDays = activeDates.size
+    const wordCountsBySet = new Map()
+    for (const word of vocabularies) {
+      if (word.set_id !== null) {
+        const key = String(word.set_id)
+        wordCountsBySet.set(key, (wordCountsBySet.get(key) || 0) + 1)
+      }
     }
 
     return response.json({
       summary: {
-        totalVocabulary: count(summaryRow.total_vocabulary),
-        new: count(summaryRow.new_count),
-        learning: count(summaryRow.learning_count),
-        learned: count(summaryRow.learned_count),
-        dueToday: count(summaryRow.due_now),
-        reviewedToday: count(summaryRow.reviewed_today),
+        totalVocabulary: vocabularies.length,
+        new: vocabularies.filter((word) => word.status === 'new' || !latestReviewByVocabulary.has(String(word.id))).length,
+        learning: vocabularies.filter((word) => word.status === 'learning').length,
+        learned: vocabularies.filter((word) => word.status === 'learned').length,
+        dueToday: latestReviews.filter((review) => new Date(review.next_review_at).getTime() <= now).length,
+        reviewedToday: history.filter((review) => inRange(review.reviewed_at, window.todayStart, window.tomorrowStart)).length,
       },
       ratings: {
         total: totalReviews,
         ...ratingCounts,
-        percentages: Object.fromEntries(
-          Object.entries(ratingCounts).map(([rating, value]) => [rating, percentage(value, totalReviews)]),
-        ),
+        percentages: Object.fromEntries(Object.entries(ratingCounts).map(([rating, value]) => [rating, percentage(value, totalReviews)])),
       },
-      performance: {
-        activeDays,
-        averageReviewsPerActiveDay: activeDays > 0
-          ? Number((totalReviews / activeDays).toFixed(1))
-          : 0,
-      },
-      last7Days: activityRows.map((row) => ({
-        startUtc: row.start_utc,
-        reviews: count(row.reviews),
-        added: count(row.added),
-      })),
+      performance: { activeDays, averageReviewsPerActiveDay: activeDays > 0 ? Number((totalReviews / activeDays).toFixed(1)) : 0 },
+      last7Days: dayRows,
       upcoming: {
-        dueThroughToday: count(upcomingRow.due_through_today),
-        tomorrow: count(upcomingRow.tomorrow),
-        nextSevenDays: count(upcomingRow.next_seven_days),
+        dueThroughToday: latestReviews.filter((review) => new Date(review.next_review_at) < new Date(window.tomorrowStart)).length,
+        tomorrow: latestReviews.filter((review) => inRange(review.next_review_at, window.tomorrowStart, window.dayAfterTomorrowStart)).length,
+        nextSevenDays: latestReviews.filter((review) => inRange(review.next_review_at, window.dayAfterTomorrowStart, window.nextSevenDaysEnd)).length,
       },
       reviewSets: {
-        total: count(setCountRow.total),
-        recent: recentSets,
+        total: sets.length,
+        recent: sets.slice(0, 3).map((set) => ({ ...set, word_count: wordCountsBySet.get(String(set.id)) || 0 })),
       },
-      recentActivity,
+      recentActivity: history.slice(0, 5).map((review) => ({
+        id: review.id,
+        rating: review.rating,
+        reviewed_at: review.reviewed_at,
+        vocabulary_id: review.vocabulary_id,
+        word: vocabularyById.get(String(review.vocabulary_id))?.word || '',
+      })),
     })
-  } catch (error) {
-    console.error(error.message)
-    return response.status(500).json({ error: 'Could not calculate dashboard statistics.' })
-  }
-})
+  })
 
-export default router
+  return router
+}

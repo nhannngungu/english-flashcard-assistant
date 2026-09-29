@@ -1,5 +1,4 @@
-import { Router } from 'express'
-import db from '../database.js'
+import { createAsyncRouter } from '../middleware/asyncRoute.js'
 import { isValidEnglishVocabulary, normalizeLookupVocabulary } from './dictionary.js'
 import { analyzeCefrText, normalizeExistingVocabulary } from '../services/cefrAnalysis.js'
 import { prepareContextVocabularyItem } from '../services/contextVocabulary.js'
@@ -10,24 +9,18 @@ import {
   generateVocabularyCandidates,
 } from '../services/vocabularyRecommendations.js'
 
-const router = Router()
 const maximumTextLength = 100_000
 const maximumPrepareItems = 30
 const allowedCefrLevels = new Set(['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'Unknown'])
 const allowedRecommendationTargets = new Set(['A2', 'B1', 'B2', 'C1'])
 
-function loadExistingVocabulary() {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT word FROM vocabularies', (error, rows) => {
-      if (error) {
-        reject(error)
-        return
-      }
-
-      resolve(new Set(rows.map((row) => normalizeExistingVocabulary(row.word)).filter(Boolean)))
-    })
-  })
+async function loadExistingVocabulary(database, userId) {
+  const result = await database.query('SELECT word FROM vocabularies WHERE user_id = $1', [userId])
+  return new Set(result.rows.map((row) => normalizeExistingVocabulary(row.word)).filter(Boolean))
 }
+
+export default function createAnalysisRouter(database) {
+const router = createAsyncRouter()
 
 router.post('/cefr', async (request, response, next) => {
   const text = request.body?.text
@@ -41,7 +34,7 @@ router.post('/cefr', async (request, response, next) => {
   }
 
   try {
-    const existingVocabulary = await loadExistingVocabulary()
+    const existingVocabulary = await loadExistingVocabulary(database, request.user.id)
     return response.json(analyzeCefrText(text, existingVocabulary))
   } catch (error) {
     return next(error)
@@ -70,7 +63,7 @@ router.post('/recommendations', async (request, response, next) => {
   const useAi = request.body?.use_ai === true
 
   try {
-    const existingVocabulary = await loadExistingVocabulary()
+    const existingVocabulary = await loadExistingVocabulary(database, request.user.id)
     const analysis = analyzeCefrText(text, existingVocabulary)
     const deterministicCandidates = generateVocabularyCandidates({
       text,
@@ -168,7 +161,7 @@ router.post('/prepare-vocabulary', async (request, response, next) => {
   }
 
   try {
-    const existingVocabulary = await loadExistingVocabulary()
+    const existingVocabulary = await loadExistingVocabulary(database, request.user.id)
     const preparedItems = await mapWithConcurrency(items, async (item) => {
       if (
         item.normalized.length > 80
@@ -221,4 +214,5 @@ router.post('/translate-definition', async (request, response) => {
   })
 })
 
-export default router
+return router
+}

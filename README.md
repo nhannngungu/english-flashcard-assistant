@@ -53,7 +53,8 @@ English Flashcard Assistant is a full-stack vocabulary learning application that
 
 - **Frontend:** React, Vite, JavaScript, CSS
 - **Backend:** Node.js, Express
-- **Database:** SQLite
+- **Database:** PostgreSQL (Neon-compatible pooled connection)
+- **Authentication:** JWT bearer tokens with bcrypt password hashing
 - **External services:** OCR.space, Tesseract.js fallback, Pexels, dictionary providers, and a translation provider
 
 External services are called only from the backend. Browser code never receives provider secrets.
@@ -73,7 +74,7 @@ english-flashcard-assistant/
 │   │   ├── data/cefr/           # Local CEFR datasets
 │   │   ├── routes/              # OCR, analysis, vocabulary, review-set, statistics APIs
 │   │   ├── services/            # CEFR, SRS, context, recommendation, and provider logic
-│   │   └── database.js          # SQLite initialization and safe migrations
+│   │   └── database.js          # PostgreSQL pool, initialization, and safe migrations
 │   └── .env.example             # Environment-variable placeholders
 ├── docs/screenshots/            # Project screenshots
 ├── CHANGELOG.md
@@ -101,18 +102,37 @@ cd ../client
 npm install
 ```
 
-Copy `server/.env.example` to `server/.env`, then add the provider keys you intend to use. Provider-key placeholders include:
+Copy `server/.env.example` to `server/.env`, then configure local PostgreSQL and authentication:
 
 ```dotenv
-PEXELS_API_KEY=your_pexels_api_key_here
-OCR_SPACE_API_KEY=your_ocr_space_api_key_here
+DATABASE_URL=postgresql://user:password@host/database?sslmode=require
+JWT_SECRET=replace_with_a_strong_random_secret
+PEXELS_API_KEY=
+OCR_SPACE_API_KEY=
+CLIENT_ORIGIN=http://localhost:5173
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
 ```
 
-Optional AI ranking settings are also documented in `server/.env.example`. Do not put real values in this README or any tracked file.
+`DATABASE_URL` and `JWT_SECRET` are required. Startup fails clearly when either is missing. Avatar uploads require all three Cloudinary values and return a clear configuration error when they are absent. Use a strong random production JWT secret and never put real values in tracked files. The server initializes the schema with non-destructive `CREATE TABLE IF NOT EXISTS` and safe `ALTER TABLE` migrations.
 
 ## Production environment
 
-For a Render backend, set `DATABASE_PATH` to a persistent-disk location such as `/var/data/english-flashcards.db` and set `CLIENT_ORIGIN` to the deployed frontend origin. The server uses `PORT` when Render provides it.
+For a Render backend, configure these environment variables:
+
+```dotenv
+DATABASE_URL=<Neon pooled connection string>
+JWT_SECRET=<strong random production secret>
+CLIENT_ORIGIN=<exact frontend origin, without a trailing slash>
+PEXELS_API_KEY=<Pexels key, if image search is enabled>
+OCR_SPACE_API_KEY=<OCR.space key, if OCR is enabled>
+CLOUDINARY_CLOUD_NAME=<Cloudinary cloud name>
+CLOUDINARY_API_KEY=<Cloudinary API key>
+CLOUDINARY_API_SECRET=<Cloudinary API secret>
+```
+
+The server uses `PORT` when Render provides it. Never expose `DATABASE_URL`, `JWT_SECRET`, or provider keys through Vite/frontend variables.
 
 For a separately deployed frontend, copy `client/.env.example` to `client/.env` and set `VITE_API_BASE_URL` to the backend API base URL, for example `https://example-backend.onrender.com/api`. Leave it blank during local development to use Vite's `/api` proxy.
 
@@ -154,7 +174,29 @@ cd client
 npm run build
 ```
 
-Version 3 verification completed with **24 backend tests passing** and a successful frontend production build.
+Current verification completes with **51 backend tests passing** and a successful frontend production build.
+
+## Authentication and data ownership
+
+- Register with `POST /api/auth/register`, sign in with an email or case-insensitive display name at `POST /api/auth/login`, and restore a session with protected `GET /api/auth/me`.
+- Display names are case-insensitively unique. `PATCH /api/auth/profile` updates the authenticated user's display name.
+- `POST /api/auth/avatar` accepts a JPEG, PNG, or WebP image up to 5 MB and uploads a server-authenticated 256×256 avatar to Cloudinary. `DELETE /api/auth/avatar` removes it.
+- Cloudinary stores the image while PostgreSQL stores only `avatar_url` and `avatar_public_id`. Replacing an avatar uploads the new image before removing the old one.
+- JWTs expire after seven days and contain only the user id, normalized email, and standard JWT timestamps.
+- Vocabulary, sets, review history, Smart Review, analysis against saved words, and dashboard statistics are protected and filtered by the authenticated user id.
+- Set ownership is enforced before assignment, and review updates plus history insertion run in one PostgreSQL transaction.
+- Creating a set with one or more vocabulary items uses `POST /api/vocabulary-sets/with-vocabularies`, which saves the set and all items atomically.
+- The browser stores the JWT in `localStorage` for this portfolio app. This is simpler than httpOnly-cookie authentication but is more exposed to a successful XSS attack.
+
+The previous `server/data/flashcards.db` SQLite file is intentionally left untouched as a backup. Runtime code does not open it, and legacy rows are not automatically copied into PostgreSQL. Legacy migration can be performed separately after an ownership mapping is chosen.
+
+## Two-account manual isolation test
+
+1. Start both applications, register `a@example.com`, and add a vocabulary item such as `alpha`.
+2. Log out, register `b@example.com`, and confirm the Vocabulary page, Dashboard, Smart Review, review sets, and recent activity do not show `alpha`.
+3. As B, add `beta`, put it in a review set, and record a review rating.
+4. Log out and sign back in as `a@example.com`. Confirm only `alpha` is visible and A's dashboard/review history contains no B activity.
+5. Sign back in as `b@example.com`. Confirm only `beta`, B's set, B's rating, and B's statistics are visible.
 
 ## Version 3 workflow
 
@@ -174,6 +216,8 @@ The development API base URL is `http://localhost:3000`.
 
 | Area | Endpoint examples |
 | --- | --- |
+| Authentication | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `PATCH /api/auth/profile` |
+| Avatar | `POST/DELETE /api/auth/avatar` |
 | Vocabulary | `GET/POST /api/vocabularies`, `PUT/DELETE /api/vocabularies/:id` |
 | Review | `GET /api/vocabularies/review/smart`, `POST /api/vocabularies/:id/review` |
 | Vocabulary sets | `GET/POST /api/vocabulary-sets`, `GET/PATCH /api/vocabulary-sets/:id` |
@@ -214,11 +258,16 @@ The development API base URL is `http://localhost:3000`.
 - `server/.env` is ignored by Git.
 - `server/.env.example` contains placeholders only.
 - OCR, image, dictionary, translation, and optional AI provider keys remain on the server.
+- Cloudinary credentials remain server-side; the browser sends only the selected avatar file to the protected backend endpoint.
+- Passwords are bcrypt hashes and are never returned by the API.
+- Protected requests use `Authorization: Bearer <token>`; user identity is never accepted from a request body.
 
 ## Known limitations
 
 - Dictionary, translation, OCR, and image providers require internet access and may depend on third-party availability.
-- Authentication and multi-user support are not implemented.
+- JWTs are stored in browser `localStorage`; a production system with a broader threat model should consider secure, same-site, httpOnly cookies and CSRF protection.
+- Existing SQLite data is retained as a backup but is not automatically migrated because shared legacy rows have no safe user owner mapping.
+- Password reset, email verification, refresh-token rotation, session revocation, and rate limiting are not yet implemented.
 - The current SRS is deterministic and intentionally simple; advanced FSRS scheduling is not implemented.
 
 ## Version history

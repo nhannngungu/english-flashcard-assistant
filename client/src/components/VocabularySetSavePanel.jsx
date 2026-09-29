@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react'
-import { createVocabulary, getVocabularies } from '../api/vocabularies.js'
-import { createVocabularySet } from '../api/vocabularySets.js'
+import { getVocabularies } from '../api/vocabularies.js'
+import { createVocabularySetWithVocabularies } from '../api/vocabularySets.js'
 import VocabularySetFields from './VocabularySetFields.jsx'
 
 function vocabularyKey(value) {
@@ -51,13 +51,10 @@ function VocabularySetSavePanel({
         return
       }
 
-      const vocabularySet = await createVocabularySet({ title, cover_image_url: coverImageUrl })
-      let saved = 0
-      const failures = []
-
-      for (const item of newItems) {
-        try {
-          await createVocabulary({
+      const result = await createVocabularySetWithVocabularies({
+        title,
+        cover_image_url: coverImageUrl,
+        vocabularies: newItems.map((item) => ({
             word: item.word,
             phonetic: item.phonetic || '',
             meaning_vi: item.meaning_vi || '',
@@ -66,18 +63,12 @@ function VocabularySetSavePanel({
             example: item.example || '',
             audio_url: item.audio_url || '',
             image_url: item.image_url || '',
-            set_id: vocabularySet.id,
             status: 'new',
-          })
-          saved += 1
-        } catch (saveError) {
-          failures.push(`${item.word}: ${saveError.message}`)
-        }
-      }
+        })),
+      })
 
-      if (saved > 0) onVocabularyCreated()
-      setMessage(`${vocabularySet.title}: ${saved} saved, ${savableItems.length - newItems.length} already existed${failures.length ? `, ${failures.length} failed` : ''}.`)
-      if (failures.length) setError(failures.join(' '))
+      onVocabularyCreated()
+      setMessage(`${result.set.title}: ${result.vocabularies.length} saved, ${savableItems.length - newItems.length} already existed.`)
     } catch (requestError) {
       setError(requestError.message)
     } finally {

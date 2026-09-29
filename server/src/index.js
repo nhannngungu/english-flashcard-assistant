@@ -1,92 +1,31 @@
-import express from 'express'
 import { fileURLToPath } from 'node:url'
-import db from './database.js'
-import analysisRoutes from './routes/analysis.js'
-import dictionaryRoutes from './routes/dictionary.js'
-import imageRoutes from './routes/images.js'
-import importRoutes from './routes/imports.js'
-import statisticsRoutes from './routes/statistics.js'
-import vocabularyRoutes from './routes/vocabularies.js'
-import vocabularySetRoutes from './routes/vocabularySets.js'
+import { createApp } from './app.js'
+import { createDatabasePool, initializeDatabase } from './database.js'
+import { createCloudinaryAvatarStorage } from './services/avatarStorage.js'
 
 try {
   process.loadEnvFile(fileURLToPath(new URL('../.env', import.meta.url)))
 } catch (error) {
-  if (error.code !== 'ENOENT') {
-    console.warn(`Could not load server/.env: ${error.message}`)
-  }
+  if (error.code !== 'ENOENT') console.warn(`Could not load server/.env: ${error.message}`)
 }
 
-const app = express()
-const port = process.env.PORT || 3000
-const configuredClientOrigins = (process.env.CLIENT_ORIGIN || '')
-  .split(',')
-  .map((origin) => origin.trim().replace(/\/$/, ''))
-  .filter(Boolean)
-const allowedClientOrigins = new Set(configuredClientOrigins)
+async function startServer() {
+  if (!process.env.DATABASE_URL?.trim()) throw new Error('DATABASE_URL is required. Add the Neon PostgreSQL connection string to server/.env.')
+  if (!process.env.JWT_SECRET?.trim()) throw new Error('JWT_SECRET is required. Add a strong random secret to server/.env.')
 
-function isAllowedClientOrigin(origin) {
-  if (allowedClientOrigins.has(origin)) return true
-
-  try {
-    const url = new URL(origin)
-    return (url.protocol === 'http:' || url.protocol === 'https:')
-      && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
-  } catch {
-    return false
-  }
-}
-
-app.use(express.json())
-
-app.use((request, response, next) => {
-  const origin = request.get('origin')
-
-  if (origin && !isAllowedClientOrigin(origin)) {
-    return response.status(403).json({ error: 'This origin is not allowed to access the API.' })
-  }
-
-  if (origin) {
-    response.setHeader('Access-Control-Allow-Origin', origin)
-    response.setHeader('Vary', 'Origin')
-    response.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
-    response.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-  }
-
-  if (request.method === 'OPTIONS') {
-    return response.sendStatus(204)
-  }
-
-  return next()
-})
-
-app.get('/api/health', (request, response) => {
-  db.get('SELECT 1 AS connected', (error) => {
-    if (error) {
-      return response.status(503).json({ status: 'error', database: 'unavailable' })
-    }
-
-    return response.json({ status: 'ok', database: 'connected' })
+  const database = createDatabasePool(process.env.DATABASE_URL)
+  await initializeDatabase(database)
+  const avatarStorage = createCloudinaryAvatarStorage({
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET,
   })
-})
+  const app = createApp({ database, jwtSecret: process.env.JWT_SECRET, clientOrigins: process.env.CLIENT_ORIGIN, avatarStorage })
+  const port = process.env.PORT || 3000
+  app.listen(port, () => console.log(`Server is running at http://localhost:${port}`))
+}
 
-app.use('/api/vocabularies', vocabularyRoutes)
-app.use('/api/vocabulary-sets', vocabularySetRoutes)
-app.use('/api/analysis', analysisRoutes)
-app.use('/api/dictionary', dictionaryRoutes)
-app.use('/api/images', imageRoutes)
-app.use('/api/import', importRoutes)
-app.use('/api/statistics', statisticsRoutes)
-
-app.use((error, request, response, next) => {
-  if (error instanceof SyntaxError && 'body' in error) {
-    return response.status(400).json({ error: 'Request body must be valid JSON.' })
-  }
-
-  console.error(error)
-  return response.status(500).json({ error: 'An unexpected server error occurred.' })
-})
-
-app.listen(port, () => {
-  console.log(`Server is running at http://localhost:${port}`)
+startServer().catch((error) => {
+  console.error(`Server startup failed: ${error.message}`)
+  process.exitCode = 1
 })

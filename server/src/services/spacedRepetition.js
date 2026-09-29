@@ -6,7 +6,6 @@ export const reviewRatings = new Set(['again', 'hard', 'good', 'easy'])
 function roundedDays(value) {
   return Math.max(1, Math.round(value))
 }
-
 export function calculateReviewSchedule({
   rating,
   previousIntervalDays = 0,
@@ -46,8 +45,4 @@ export function calculateReviewSchedule({
     easeFactor: Number(easeFactor.toFixed(2)),
     nextReviewAt: new Date(now.getTime() + delay),
   }
-}
-
-export function toSqliteUtc(date) {
-  return date.toISOString().slice(0, 19).replace('T', ' ')
 }
