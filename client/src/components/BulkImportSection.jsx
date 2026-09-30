@@ -8,6 +8,7 @@ import ImageSuggestions from './ImageSuggestions.jsx'
 import VocabularySetFields from './VocabularySetFields.jsx'
 import { createVocabularySetWithVocabularies } from '../api/vocabularySets.js'
 import { parseBulkWords, runWithConcurrency } from '../utils/bulkImport.js'
+import { mergeVocabularyEnrichment, needsVocabularyEnrichment } from '../utils/vocabularyEnrichment.js'
 
 const editableFields = [
   ['meaning_vi', 'Vietnamese Meaning'],
@@ -33,6 +34,9 @@ function createPendingItem(word, index) {
     imageSearchPage: 1,
     expanded: false,
     translationUnavailable: false,
+    enrichmentNotice: '',
+    dirtyFields: [],
+    unavailableFields: [],
     status: 'new',
     lookupStatus: 'pending',
     lookupError: '',
@@ -62,6 +66,7 @@ function statusText(item) {
   if (item.saveStatus === 'saved') return 'Saved'
   if (item.saveStatus === 'skipped') return 'Skipped (already exists)'
   if (item.saveStatus === 'failed') return 'Save failed'
+  if (item.translationUnavailable) return 'Ready · Vietnamese unavailable'
   return 'Ready to save'
 }
 
@@ -112,41 +117,54 @@ function BulkImportSection({ initialWords = [], onVocabularyCreated = () => {} }
     updateItem(item.id, {
       lookupStatus: 'loading',
       lookupError: '',
+      enrichmentNotice: '',
       saveStatus: 'idle',
       saveError: '',
     })
 
     try {
       const result = await lookupDictionary(item.word)
-      updateItem(item.id, {
-        word: result.word || item.word,
-        phonetic: result.phonetic || '',
-        meaning_vi: result.meaning_vi || '',
-        meaning_en: result.meaning_en || '',
-        part_of_speech: result.part_of_speech || '',
-        example: result.example || '',
-        audio_url: result.audio_url || '',
-        image_url: '',
-        imageStatus: 'idle',
-        imageSuggestions: [],
-        imageError: '',
-        imageSearchPage: 1,
-        translationUnavailable: !result.meaning_vi,
-        lookupStatus: 'success',
-        lookupError: '',
-        selected: true,
-      })
+      setItems((currentItems) => currentItems.map((currentItem) => {
+        if (currentItem.id !== item.id) return currentItem
+
+        const merged = mergeVocabularyEnrichment(currentItem, result)
+        return {
+          ...merged.item,
+          word: result.word || currentItem.word,
+          translationUnavailable: merged.translationUnavailable,
+          enrichmentNotice: merged.translationUnavailable
+            ? 'English definition found, but Vietnamese translation is unavailable. You can retry or enter it manually.'
+            : '',
+          unavailableFields: merged.unavailableFields,
+          lookupStatus: 'success',
+          lookupError: '',
+          selected: true,
+        }
+      }))
     } catch (error) {
-      updateItem(item.id, {
-        lookupStatus: 'failed',
-        lookupError: lookupErrorMessage(error),
-        selected: false,
-      })
+      setItems((currentItems) => currentItems.map((currentItem) => {
+        if (currentItem.id !== item.id) return currentItem
+        const hasDictionaryData = Boolean(currentItem.meaning_en || currentItem.phonetic || currentItem.part_of_speech)
+
+        return hasDictionaryData
+          ? {
+              ...currentItem,
+              lookupStatus: 'success',
+              lookupError: '',
+              enrichmentNotice: 'Could not refresh the missing enrichment fields. Existing values were kept.',
+            }
+          : {
+              ...currentItem,
+              lookupStatus: 'failed',
+              lookupError: lookupErrorMessage(error),
+              selected: false,
+            }
+      }))
     }
   }
 
   async function handleLookupAll() {
-    const itemsToLookup = items.filter((item) => item.lookupStatus !== 'success')
+    const itemsToLookup = items.filter(needsVocabularyEnrichment)
 
     if (itemsToLookup.length === 0) return
 
@@ -174,7 +192,17 @@ function BulkImportSection({ initialWords = [], onVocabularyCreated = () => {} }
   }
 
   function handleFieldChange(id, field, value) {
-    updateItem(id, { [field]: value, saveStatus: 'idle', saveError: '' })
+    setItems((currentItems) => currentItems.map((item) => item.id === id
+      ? {
+          ...item,
+          [field]: value,
+          dirtyFields: [...new Set([...item.dirtyFields, field])],
+          enrichmentNotice: field === 'meaning_vi' ? '' : item.enrichmentNotice,
+          translationUnavailable: field === 'meaning_vi' ? !value.trim() : item.translationUnavailable,
+          saveStatus: 'idle',
+          saveError: '',
+        }
+      : item))
   }
 
   function handleSelection(id, selected) {
@@ -323,7 +351,7 @@ function BulkImportSection({ initialWords = [], onVocabularyCreated = () => {} }
     (item) => item.lookupStatus === 'success' && !['saved', 'skipped'].includes(item.saveStatus),
   )
   const selectedCount = successfulItems.filter((item) => item.selected).length
-  const lookupableCount = items.filter((item) => item.lookupStatus !== 'success').length
+  const lookupableCount = items.filter(needsVocabularyEnrichment).length
 
   return (
     <section className="bulk-import-section" aria-labelledby="bulk-import-title">
@@ -388,14 +416,21 @@ function BulkImportSection({ initialWords = [], onVocabularyCreated = () => {} }
                       {statusText(item)}
                     </span>
                     {item.lookupStatus === 'success' && (
-                      <button
-                        aria-expanded={item.expanded}
-                        className="subtle-button"
-                        onClick={() => toggleDetails(item.id)}
-                        type="button"
-                      >
-                        {item.expanded ? 'Hide details' : 'Edit details'}
-                      </button>
+                      <>
+                        {needsVocabularyEnrichment(item) && (
+                          <button className="subtle-button" disabled={isLookingUp || isSaving} onClick={() => handleRetry(item)} type="button">
+                            Retry missing
+                          </button>
+                        )}
+                        <button
+                          aria-expanded={item.expanded}
+                          className="subtle-button"
+                          onClick={() => toggleDetails(item.id)}
+                          type="button"
+                        >
+                          {item.expanded ? 'Hide details' : 'Edit details'}
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -420,6 +455,10 @@ function BulkImportSection({ initialWords = [], onVocabularyCreated = () => {} }
                         <dd className={`bulk-image-status bulk-image-status-${item.imageStatus}`}>{imageStatusText(item)}</dd>
                       </div>
                     </dl>
+
+                    {item.enrichmentNotice && (
+                      <p className="message notice-message bulk-enrichment-notice" role="status">{item.enrichmentNotice}</p>
+                    )}
 
                     {item.expanded && (
                       <div className="bulk-item-details">
@@ -446,12 +485,6 @@ function BulkImportSection({ initialWords = [], onVocabularyCreated = () => {} }
                             </div>
                           ))}
                         </div>
-                        {item.translationUnavailable && (
-                          <p className="message notice-message" role="status">
-                            Vietnamese translation is unavailable. You can enter it manually.
-                          </p>
-                        )}
-
                         <section className="bulk-image-section" aria-label={`Image selection for ${item.word}`}>
                           <div className="bulk-image-heading">
                             <h4>Image suggestions</h4>

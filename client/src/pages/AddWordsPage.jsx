@@ -5,6 +5,7 @@ import BulkImportSection from '../components/BulkImportSection.jsx'
 import ImageSuggestions from '../components/ImageSuggestions.jsx'
 import VocabularyFormFields from '../components/VocabularyFormFields.jsx'
 import VocabularySetFields from '../components/VocabularySetFields.jsx'
+import { mergeVocabularyEnrichment } from '../utils/vocabularyEnrichment.js'
 
 const initialForm = {
   word: '',
@@ -89,14 +90,8 @@ function AddWordsPage({ onVocabularyCreated }) {
     try {
       const dictionaryEntry = await lookupDictionary(form.word)
       setForm((currentForm) => ({
-        ...currentForm,
+        ...mergeVocabularyEnrichment(currentForm, dictionaryEntry).item,
         word: dictionaryEntry.word || currentForm.word,
-        phonetic: dictionaryEntry.phonetic || currentForm.phonetic,
-        part_of_speech: dictionaryEntry.part_of_speech || currentForm.part_of_speech,
-        meaning_vi: dictionaryEntry.meaning_vi || currentForm.meaning_vi,
-        meaning_en: dictionaryEntry.meaning_en || currentForm.meaning_en,
-        example: dictionaryEntry.example || currentForm.example,
-        audio_url: dictionaryEntry.audio_url || currentForm.audio_url,
       }))
       setDictionarySource(dictionaryEntry.source || '')
       setTranslationSource(dictionaryEntry.translation_source || '')
