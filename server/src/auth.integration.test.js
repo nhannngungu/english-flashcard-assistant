@@ -24,6 +24,11 @@ describe('authentication and user data isolation', () => {
       returns: DataType.text,
       implementation: (value) => value.trim(),
     })
+    memory.public.registerFunction({
+      name: 'random',
+      returns: DataType.float,
+      implementation: () => Math.random(),
+    })
     memory.public.none(`
       CREATE TABLE users (
         id BIGSERIAL PRIMARY KEY,
@@ -279,6 +284,53 @@ describe('authentication and user data isolation', () => {
     setB = (await request(app).post('/api/vocabulary-sets').set('Authorization', `Bearer ${tokenB}`).send({ title: 'B set' }).expect(201)).body
     await request(app).get(`/api/vocabulary-sets/${setB.id}`).set('Authorization', `Bearer ${tokenA}`).expect(404)
     await request(app).post('/api/vocabularies').set('Authorization', `Bearer ${tokenA}`).send({ word: 'cross-user', set_id: setB.id }).expect(404)
+  })
+
+  test('LinkLab random sessions validate options, eligibility, and user ownership', async () => {
+    await request(app).get('/api/linklab/random?mode=classic&limit=12&status=all').expect(401)
+    await request(app).get('/api/linklab/random?mode=unknown&limit=18&status=all').set('Authorization', `Bearer ${tokenA}`).expect(400)
+    await request(app).get('/api/linklab/random?mode=classic&limit=7&status=all').set('Authorization', `Bearer ${tokenA}`).expect(400)
+
+    const classic = (await request(app).post('/api/vocabularies').set('Authorization', `Bearer ${tokenA}`).send({
+      word: 'benefit', meaning_vi: 'lợi ích', status: 'new',
+    }).expect(201)).body
+    const deep = (await request(app).post('/api/vocabularies').set('Authorization', `Bearer ${tokenA}`).send({
+      word: 'sustainable', meaning_vi: 'bền vững', example: 'This is a sustainable plan.', status: 'learning',
+    }).expect(201)).body
+    const visual = (await request(app).post('/api/vocabularies').set('Authorization', `Bearer ${tokenA}`).send({
+      word: 'forest', image_url: 'https://images.example/forest.jpg', status: 'learned',
+    }).expect(201)).body
+    await request(app).post('/api/vocabularies').set('Authorization', `Bearer ${tokenB}`).send({
+      word: 'private', meaning_vi: 'riêng tư', example: 'Private data.', image_url: 'https://images.example/private.jpg',
+    }).expect(201)
+
+    const classicResponse = await request(app).get('/api/linklab/random?mode=classic&limit=12&status=all')
+      .set('Authorization', `Bearer ${tokenA}`).expect(200)
+    assert.equal(classicResponse.body.requested_limit, 12)
+    assert.equal(classicResponse.body.reduced, true)
+    assert.ok(classicResponse.body.items.some((word) => word.id === classic.id))
+    assert.ok(classicResponse.body.items.some((word) => word.id === deep.id))
+    assert.ok(classicResponse.body.items.every((word) => word.user_id !== userBId))
+    assert.equal(new Set(classicResponse.body.items.map((word) => word.id)).size, classicResponse.body.items.length)
+
+    const deepResponse = await request(app).get('/api/linklab/random?mode=deep&limit=18&status=learning')
+      .set('Authorization', `Bearer ${tokenA}`).expect(200)
+    assert.deepEqual(deepResponse.body.items.map((word) => word.id), [deep.id])
+
+    const visualResponse = await request(app).get('/api/linklab/random?mode=visual&limit=24&status=learned')
+      .set('Authorization', `Bearer ${tokenA}`).expect(200)
+    assert.deepEqual(visualResponse.body.items.map((word) => word.id), [visual.id])
+
+    await pool.query(
+      `INSERT INTO review_history (user_id, vocabulary_id, rating, next_review_at) VALUES ($1, $2, 'good', $3)`,
+      [deep.user_id, deep.id, new Date(Date.now() + 86_400_000).toISOString()],
+    )
+    const dueResponse = await request(app).get('/api/linklab/random?mode=classic&limit=12&status=due')
+      .set('Authorization', `Bearer ${tokenA}`).expect(200)
+    assert.ok(dueResponse.body.items.some((word) => word.id === classic.id))
+    assert.ok(dueResponse.body.items.every((word) => word.id !== deep.id))
+
+    await pool.query(`DELETE FROM vocabularies WHERE word IN ('benefit', 'sustainable', 'forest', 'private')`)
   })
 
   test('dashboard statistics are scoped to the authenticated user', async () => {

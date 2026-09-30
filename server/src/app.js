@@ -7,6 +7,7 @@ import createAuthRouter from './routes/auth.js'
 import dictionaryRoutes from './routes/dictionary.js'
 import imageRoutes from './routes/images.js'
 import importRoutes from './routes/imports.js'
+import createLinkLabRouter from './routes/linkLab.js'
 import createStatisticsRouter from './routes/statistics.js'
 import createVocabularyRouter from './routes/vocabularies.js'
 import createVocabularySetRouter from './routes/vocabularySets.js'
@@ -55,6 +56,7 @@ export function createApp({ database, jwtSecret, clientOrigins = '', avatarStora
   app.use('/api/auth', createAuthRouter(database, { jwtSecret, authenticateToken, avatarStorage }))
   app.use('/api/vocabularies', authenticateToken, createVocabularyRouter(database))
   app.use('/api/vocabulary-sets', authenticateToken, createVocabularySetRouter(database))
+  app.use('/api/linklab', authenticateToken, createLinkLabRouter(database))
   app.use('/api/statistics', authenticateToken, createStatisticsRouter(database))
   app.use('/api/analysis', authenticateToken, createAnalysisRouter(database))
   app.use('/api/dictionary', dictionaryRoutes)

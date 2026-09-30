@@ -5,6 +5,7 @@ import UserProfileCard from './components/UserProfileCard.jsx'
 import AddWordsPage from './pages/AddWordsPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import ImportPage from './pages/ImportPage.jsx'
+import LinkLabPage from './pages/LinkLabPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
 import ReviewPage from './pages/ReviewPage.jsx'
@@ -16,6 +17,7 @@ const pageTitles = {
   'add-words': 'Add Words',
   import: 'Import',
   review: 'Review',
+  linklab: 'LinkLab',
 }
 
 function App() {
@@ -24,6 +26,7 @@ function App() {
   const [activePage, setActivePage] = useState('dashboard')
   const [vocabularyRefreshKey, setVocabularyRefreshKey] = useState(0)
   const [reviewInitialMode, setReviewInitialMode] = useState('smart')
+  const [linkLabSet, setLinkLabSet] = useState(null)
 
   function handleVocabularyCreated() {
     setVocabularyRefreshKey((currentKey) => currentKey + 1)
@@ -32,6 +35,11 @@ function App() {
   function handleNavigate(page, reviewMode = 'smart') {
     if (page === 'review') setReviewInitialMode(reviewMode)
     setActivePage(page)
+  }
+
+  function openLinkLab(vocabularySet) {
+    setLinkLabSet(vocabularySet)
+    setActivePage('linklab')
   }
 
   useEffect(() => {
@@ -57,7 +65,9 @@ function App() {
   } else if (activePage === 'import') {
     pageContent = <ImportPage onVocabularyCreated={handleVocabularyCreated} />
   } else if (activePage === 'review') {
-    pageContent = <ReviewPage initialMode={reviewInitialMode} />
+    pageContent = <ReviewPage initialMode={reviewInitialMode} onOpenLinkLab={openLinkLab} />
+  } else if (activePage === 'linklab') {
+    pageContent = <LinkLabPage onBack={() => handleNavigate('review', 'sets')} vocabularySet={linkLabSet} />
   } else {
     pageContent = <DashboardPage onNavigate={handleNavigate} />
   }

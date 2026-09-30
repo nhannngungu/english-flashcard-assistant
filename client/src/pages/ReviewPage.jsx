@@ -20,7 +20,7 @@ function VocabularySetCover({ vocabularySet }) {
     : <div className="review-set-cover review-set-cover-placeholder" aria-hidden="true">Aa</div>
 }
 
-function ReviewPage({ initialMode = 'smart' }) {
+function ReviewPage({ initialMode = 'smart', onOpenLinkLab }) {
   const [mode, setMode] = useState(initialMode)
   const [cards, setCards] = useState([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -132,6 +132,12 @@ function ReviewPage({ initialMode = 'smart' }) {
     setActionError('')
   }
 
+  async function startLinkLab(id) {
+    const details = await readSet(id)
+    if (!details?.words.length) return
+    onOpenLinkLab(details)
+  }
+
   async function saveSetDetails(event) {
     event.preventDefault()
     setIsUpdating(true)
@@ -205,7 +211,10 @@ function ReviewPage({ initialMode = 'smart' }) {
               <h3>Review Sets</h3>
               <p>Choose a saved import or study collection. Ratings update the same spaced-repetition schedule and history as Smart Review.</p>
             </div>
-            <span>{setListing.total} {setListing.total === 1 ? 'set' : 'sets'}</span>
+            <div className="review-sets-heading-actions">
+              <span>{setListing.total} {setListing.total === 1 ? 'set' : 'sets'}</span>
+              <button className="secondary-button" onClick={() => onOpenLinkLab(null)} type="button">⤨ All Vocabulary LinkLab</button>
+            </div>
           </section>
 
           {setListing.items.length === 0 ? (
@@ -221,7 +230,8 @@ function ReviewPage({ initialMode = 'smart' }) {
                     <strong>{set.word_count} {set.word_count === 1 ? 'word' : 'words'}</strong>
                     <div className="review-set-card-actions">
                       <button className="subtle-button" onClick={() => showSetDetails(set.id)} type="button">Details</button>
-                      <button className="primary-button" disabled={!set.word_count} onClick={() => startSetReview(set.id)} type="button">Start Review</button>
+                      <button className="secondary-button" disabled={!set.word_count} onClick={() => startSetReview(set.id)} type="button">Flashcards</button>
+                      <button className="primary-button" disabled={!set.word_count} onClick={() => startLinkLab(set.id)} type="button">LinkLab</button>
                     </div>
                   </div>
                 </article>
@@ -255,7 +265,10 @@ function ReviewPage({ initialMode = 'smart' }) {
               </form>
               {actionError && <p className="message error-message" role="alert">Could not update set: {actionError}</p>}
               <div className="review-set-word-list">{setDetails.words.map((word) => <span key={word.id}>{word.word}</span>)}</div>
-              <button className="primary-button" disabled={!setDetails.words.length} onClick={() => startSetReview(setDetails.id)} type="button">Start Review</button>
+              <div className="review-set-detail-actions">
+                <button className="secondary-button" disabled={!setDetails.words.length} onClick={() => startSetReview(setDetails.id)} type="button">Flashcards</button>
+                <button className="primary-button" disabled={!setDetails.words.length} onClick={() => onOpenLinkLab(setDetails)} type="button">LinkLab</button>
+              </div>
             </section>
           )}
         </>

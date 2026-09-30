@@ -2906,6 +2906,27 @@ th {
   white-space: nowrap;
 }
 
+.review-set-detail-actions {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.review-set-card-actions {
+  flex-wrap: wrap;
+}
+
+.review-sets-heading-actions {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.review-sets-heading-actions .secondary-button {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
 @media (max-width: 900px) {
   .cefr-analysis-row {
     grid-template-columns: 1fr;
@@ -2937,6 +2958,16 @@ th {
 }
 
 @media (max-width: 640px) {
+  .review-sets-heading-actions {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .review-sets-heading-actions .secondary-button {
+    justify-content: center;
+    width: 100%;
+  }
+
   .app-shell {
     padding: 0 1rem;
   }
